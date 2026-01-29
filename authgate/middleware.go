@@ -57,15 +57,6 @@ func (s *SDK) TryAuth(next http.Handler) http.Handler {
 	})
 }
 
-func CSRFFromCookie(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if token, ok := CSRFToken(r); ok {
-			r.Header.Set(CSRFHeaderName, token)
-		}
-		next.ServeHTTP(w, r)
-	})
-}
-
 func buildReturnTo(r *http.Request) string {
 	if r.URL.RawQuery == "" {
 		return r.URL.Path
