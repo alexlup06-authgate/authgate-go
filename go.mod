@@ -1,4 +1,4 @@
-module github.com/alexlup06/authgate-go
+module github.com/alexlup06-authgate/authgate-go
 
 go 1.25
 

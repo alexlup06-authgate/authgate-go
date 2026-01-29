@@ -37,7 +37,7 @@ All security enforcement lives in **AuthGate**, not in this SDK.
 ## Installation
 
 ```bash
-go get github.com/alexlup06/authgate-go
+go get github.com/alexlup06-authgate/authgate-go
 ```
 
 ---
