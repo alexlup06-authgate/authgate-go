@@ -9,7 +9,15 @@ func (s *SDK) RequireAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie(AccessCookieName)
 		if err != nil {
-			http.Redirect(w, r, LoginPath, http.StatusFound)
+			loginURL := LoginPath + "?return_to=" + url.QueryEscape(buildReturnTo(r))
+
+			if r.Header.Get("HX-Request") == "true" {
+				w.Header().Set("HX-Redirect", loginURL)
+				w.WriteHeader(http.StatusOK)
+				return
+			}
+
+			http.Redirect(w, r, loginURL, http.StatusFound)
 			return
 		}
 
