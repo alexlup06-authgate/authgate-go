@@ -33,7 +33,7 @@ type LogoutFormData struct {
 // The boolean return value is false if no CSRF token is present on the request.
 func LogoutFormDataFromRequest(
 	r *http.Request,
-	returnTo string,
+	redirect string,
 ) (LogoutFormData, bool) {
 
 	token, ok := CSRFToken(r)
@@ -42,8 +42,8 @@ func LogoutFormDataFromRequest(
 	}
 
 	action := "/auth/logout"
-	if returnTo != "" {
-		action += "?return_to=" + url.QueryEscape(returnTo)
+	if redirect != "" {
+		action += "?return_to=" + url.QueryEscape(redirect)
 	}
 
 	return LogoutFormData{

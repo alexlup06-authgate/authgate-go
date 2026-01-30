@@ -24,7 +24,9 @@ func newTestSDK(t *testing.T) *SDK {
 	return sdk
 }
 
-func TestRequireAuth_NoCookie_Redirects(t *testing.T) {
+/* -------------------- RequireAuth -------------------- */
+
+func TestRequireAuth_NoCookie_BrowserRedirects(t *testing.T) {
 	sdk := newTestSDK(t)
 
 	called := false
@@ -33,6 +35,8 @@ func TestRequireAuth_NoCookie_Redirects(t *testing.T) {
 	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
+	req.Header.Set("Accept", "text/html")
+
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)
@@ -51,15 +55,16 @@ func TestRequireAuth_NoCookie_Redirects(t *testing.T) {
 	}
 }
 
-func TestRequireAuth_HTMXRedirect(t *testing.T) {
+func TestRequireAuth_NoCookie_HTMXRedirect(t *testing.T) {
 	sdk := newTestSDK(t)
 
 	handler := sdk.RequireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		t.Fatal("handler should not be called")
+		t.Fatal("handler should not have been called")
 	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
 	req.Header.Set("HX-Request", "true")
+	req.Header.Set("Accept", "text/html")
 
 	rec := httptest.NewRecorder()
 
@@ -74,6 +79,27 @@ func TestRequireAuth_HTMXRedirect(t *testing.T) {
 	}
 }
 
+func TestRequireAuth_NoCookie_APIReturns401(t *testing.T) {
+	sdk := newTestSDK(t)
+
+	handler := sdk.RequireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Fatal("handler should not have been called")
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
+	req.Header.Set("Accept", "application/json")
+
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected status 401, got %d", rec.Code)
+	}
+}
+
+/* -------------------- TryAuth -------------------- */
+
 func TestTryAuth_NoCookie_AllowsThrough(t *testing.T) {
 	sdk := newTestSDK(t)
 
@@ -83,6 +109,8 @@ func TestTryAuth_NoCookie_AllowsThrough(t *testing.T) {
 	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/optional", nil)
+	req.Header.Set("Accept", "text/html")
+
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)

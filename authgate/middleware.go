@@ -3,17 +3,23 @@ package authgate
 import (
 	"net/http"
 	"net/url"
+	"strings"
 )
 
 // RequireAuth returns middleware that enforces authentication.
 //
-// If no valid access token is present, the request is redirected to the
-// AuthGate login page with a return_to parameter pointing back to the
-// original request URL.
+// Behavior on unauthenticated requests depends on the request type:
 //
-// For HTMX requests (HX-Request: true), the middleware responds with
-// status 200 and sets the HX-Redirect header instead of issuing a
-// standard HTTP redirect.
+//   - Browser navigations (Accept: text/html):
+//     Responds with an HTTP redirect (302) to the AuthGate login page,
+//     including a return_to parameter pointing to the original request URL.
+//
+//   - HTMX requests (HX-Request: true):
+//     Responds with status 200 and sets the HX-Redirect header, causing
+//     a full client-side navigation to the login page.
+//
+//   - API / SPA requests:
+//     Responds with 401 Unauthorized and does not perform a redirect.
 //
 // On successful authentication, the user's ID and roles are injected
 // into the request context before calling the next handler.
@@ -22,28 +28,14 @@ func (s *SDK) RequireAuth(next http.Handler) http.Handler {
 		cookie, err := r.Cookie(AccessCookieName)
 		if err != nil {
 			loginURL := LoginPath + "?return_to=" + url.QueryEscape(buildReturnTo(r))
-
-			if r.Header.Get("HX-Request") == "true" {
-				w.Header().Set("HX-Redirect", loginURL)
-				w.WriteHeader(http.StatusOK)
-				return
-			}
-
-			http.Redirect(w, r, loginURL, http.StatusFound)
+			unauthenticatedResponse(w, r, loginURL)
 			return
 		}
 
 		userID, roles, err := s.verifier.verify(cookie.Value)
 		if err != nil {
 			loginURL := LoginPath + "?return_to=" + url.QueryEscape(buildReturnTo(r))
-
-			if r.Header.Get("HX-Request") == "true" {
-				w.Header().Set("HX-Redirect", loginURL)
-				w.WriteHeader(http.StatusOK)
-				return
-			}
-
-			http.Redirect(w, r, loginURL, http.StatusFound)
+			unauthenticatedResponse(w, r, loginURL)
 			return
 		}
 
@@ -51,6 +43,51 @@ func (s *SDK) RequireAuth(next http.Handler) http.Handler {
 		ctx = withRoles(ctx, roles)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+// buildReturnTo constructs the return_to value for redirects by
+// preserving the request path and query string.
+//
+// This ensures users are redirected back to the exact URL they originally
+// requested after authentication.
+func buildReturnTo(r *http.Request) string {
+	if r.URL.RawQuery == "" {
+		return r.URL.Path
+	}
+	return r.URL.Path + "?" + r.URL.RawQuery
+}
+
+func unauthenticatedResponse(w http.ResponseWriter, r *http.Request, redirectUrl string) {
+	w.Header().Add("Vary", "Accept")
+
+	switch {
+	case r.Header.Get("HX-Request") == "true":
+		w.Header().Set("HX-Redirect", redirectUrl)
+		w.WriteHeader(http.StatusOK)
+		return
+
+	case isAPICall(r):
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+
+	default:
+		http.Redirect(w, r, redirectUrl, http.StatusFound)
+		return
+	}
+}
+
+func isAPICall(r *http.Request) bool {
+	accept := r.Header.Get("Accept")
+
+	if accept == "" {
+		return true
+	}
+
+	if strings.Contains(accept, "text/html") {
+		return false
+	}
+
+	return true
 }
 
 // TryAuth returns middleware that attempts authentication if an access
@@ -76,16 +113,4 @@ func (s *SDK) TryAuth(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
-}
-
-// buildReturnTo constructs the return_to value for redirects by
-// preserving the request path and query string.
-//
-// This ensures users are redirected back to the exact URL they originally
-// requested after authentication.
-func buildReturnTo(r *http.Request) string {
-	if r.URL.RawQuery == "" {
-		return r.URL.Path
-	}
-	return r.URL.Path + "?" + r.URL.RawQuery
 }

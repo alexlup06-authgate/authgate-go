@@ -20,7 +20,7 @@ type SDK struct {
 // Example:
 //
 //	sdk, err := authgate.New(authgate.Config{
-//		Issuer:   "https://auth.example.com",
+//		Issuer:   "https://example.com",
 //		Audience: "app",
 //		Keys:     keys,
 //	})
