@@ -1,9 +1,9 @@
 # AuthGate Go SDK
 
-A minimal Go SDK for integrating backend applications with an **AuthGate**
+A minimal Go SDK for integrating backend and SSR applications with an **AuthGate**
 authentication server.
 
-This SDK is intentionally small and infrastructure-focused. Its sole
+This SDK is intentionally small and infrastructure-focused. Its primary
 responsibility is to **verify AuthGate-issued access tokens** and expose
 authentication facts to your application in a safe, explicit way.
 
@@ -12,7 +12,23 @@ policy.
 
 ---
 
+## Scope and design philosophy
+
+This SDK is designed to:
+
+- expose **facts**, not policy
+- avoid hidden behavior
+- avoid implicit network calls
+- keep authentication and authorization concerns separate
+
+AuthGate itself remains the single source of truth for authentication,
+sessions, refresh logic, CSRF enforcement, and security invariants.
+
+---
+
 ## What this SDK does
+
+### Token verification & middleware
 
 - Verifies AuthGate-issued access tokens (JWT)
 - Validates token properties:
@@ -22,7 +38,21 @@ policy.
   - signature and key ID (`kid`)
 - Injects authentication facts into `context.Context`
 - Provides HTTP middleware for common auth patterns
-- Exposes CSRF forwarding helpers for browser-based flows
+- Exposes helpers for reading authentication facts from context
+
+### Backend client helpers (optional)
+
+- Provides **explicit, side-effect-free HTTP helpers** for calling AuthGate
+  endpoints from backend or SSR applications
+- Forwards existing authentication context (access cookie) only
+- Exposes identity data via dedicated helpers (e.g. `GetCurrentUser`)
+- Offers a generic escape-hatch helper for user-defined AuthGate endpoints
+
+These helpers are **strict by design**:
+- no token refresh
+- no retries
+- no cookie mutation
+- no redirect behavior
 
 ---
 
@@ -33,22 +63,23 @@ policy.
 - Does **not** refresh tokens
 - Does **not** set, clear, or modify cookies
 - Does **not** validate CSRF tokens
-- Does **not** make network calls to AuthGate
+- Does **not** enforce authorization policy
+- Does **not** perform background or implicit network calls
 
-All security enforcement, session management, CSRF validation, and refresh logic
-live exclusively in **AuthGate itself**, not in this SDK.
+All authentication, session management, refresh logic, and CSRF enforcement live
+exclusively in **AuthGate itself**, not in this SDK.
 
 ---
 
 ## Installation
 
 ```bash
-go get github.com/alexlup06-authgate/authgate-go
+go get github.com/alexlupatsiy/authgate-go
 ```
 
 ---
 
-## Configuration
+## Configuration (token verification)
 
 ```go
 sdk, err := authgate.New(authgate.Config{
@@ -106,8 +137,8 @@ r.Use(sdk.TryAuth)
 `TryAuth` attempts to authenticate the request if a valid access token is
 present, but **never blocks or redirects**.
 
-- If authenticated - user facts are attached to the context
-- If unauthenticated - the request proceeds unchanged
+- If authenticated → user facts are attached to the context
+- If unauthenticated → the request proceeds unchanged
 
 This is useful for optional personalization.
 
@@ -126,6 +157,83 @@ The SDK exposes **facts only**:
 - session-derived roles
 
 Your application decides what these facts mean and how to enforce authorization.
+
+---
+
+## Backend client helpers
+
+The SDK provides an optional backend client for calling AuthGate endpoints from
+server-side or SSR code.
+
+### Creating a client
+
+```go
+client := authgate.NewClient("https://auth.example.com")
+```
+
+A custom `http.Client` may be provided if needed:
+
+```go
+client := authgate.NewClient(
+	"https://auth.example.com",
+	authgate.WithHTTPClient(customHTTPClient),
+)
+```
+
+---
+
+### Fetching the current user
+
+```go
+user, err := client.GetCurrentUser(ctx, r)
+if err != nil {
+	// unexpected error
+}
+
+if user == nil {
+	// not authenticated
+}
+```
+
+`GetCurrentUser`:
+
+- forwards the AuthGate access cookie from the incoming request
+- does **not** refresh tokens
+- returns `(nil, nil)` if the request is unauthenticated
+- returns an error only for unexpected failures
+
+---
+
+### Generic request helper (escape hatch)
+
+```go
+var result MyResponse
+
+resp, err := authgate.DoJSONRequest(
+	ctx,
+	client,
+	http.MethodGet,
+	"/auth/admin/custom-endpoint",
+	r,
+	&result,
+)
+if err != nil {
+	// transport or decode error
+}
+
+if resp.StatusCode != http.StatusOK {
+	// caller-defined handling
+}
+```
+
+This helper:
+
+- performs a raw HTTP request against AuthGate
+- forwards authentication context if present
+- decodes JSON **only for successful (2xx) responses**
+- does **not** implement AuthGate semantics
+
+Callers are responsible for interpreting HTTP status codes.
 
 ---
 
@@ -151,7 +259,6 @@ CSRF token generation and validation are fully owned by AuthGate.
 
 - Compatible with AuthGate v1.x
 - Safe for SSR, HTMX, and API-based applications
-- Public APIs follow semantic versioning
 
 ---
 
