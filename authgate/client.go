@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 )
 
 // ClientOption configures a Client.
@@ -157,9 +158,18 @@ func DoJSONRequest[T any](
 // This struct mirrors the response of the AuthGate `/auth/user` endpoint and
 // intentionally contains only identity data, not authorization facts.
 type CurrentUser struct {
-	ID       string `json:"id"`
-	Email    string `json:"email"`
-	Username string `json:"username"`
+	ID        string    `json:"id"`
+	Email     string    `json:"email"`
+	Username  string    `json:"username"`
+	Disabled  bool      `json:"disabled"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type ErrorResponse struct {
+	Error struct {
+		Code    string `json:"code"`
+		Message string `json:"message"`
+	} `json:"error"`
 }
 
 // GetCurrentUser retrieves the identity of the currently authenticated user.
@@ -171,11 +181,9 @@ type CurrentUser struct {
 //   - (*CurrentUser, nil): the request is authenticated and the user exists
 //   - (nil, nil): the request is not authenticated (401 Unauthorized)
 //   - (nil, error): an unexpected failure occurred
-func (c *Client) GetCurrentUser(
-	ctx context.Context,
-	incoming *http.Request,
-) (*CurrentUser, error) {
+func (c *Client) GetCurrentUser(ctx context.Context, incoming *http.Request) (*CurrentUser, error) {
 	var user CurrentUser
+	var errResp ErrorResponse
 
 	resp, err := DoJSONRequest(
 		ctx,
@@ -195,6 +203,16 @@ func (c *Client) GetCurrentUser(
 	case http.StatusUnauthorized:
 		return nil, nil
 	default:
+		_ = json.NewDecoder(resp.Body).Decode(&errResp)
+
+		if errResp.Error.Code != "" {
+			return nil, fmt.Errorf(
+				"authgate: %s (%s)",
+				errResp.Error.Code,
+				errResp.Error.Message,
+			)
+		}
+
 		return nil, fmt.Errorf("authgate: unexpected status %d", resp.StatusCode)
 	}
 }
