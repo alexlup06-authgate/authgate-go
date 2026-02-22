@@ -189,7 +189,7 @@ func (c *Client) GetCurrentUser(ctx context.Context, incoming *http.Request) (*C
 		ctx,
 		c,
 		http.MethodGet,
-		"/auth/user",
+		"/auth/api/v1/user",
 		incoming,
 		&user,
 	)

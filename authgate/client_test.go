@@ -24,7 +24,7 @@ func newTestClient(t *testing.T, handler http.Handler) (*Client, *httptest.Serve
 
 func TestGetCurrentUser_OK(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/auth/user" {
+		if r.URL.Path != "/auth/api/v1/user" {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
 
