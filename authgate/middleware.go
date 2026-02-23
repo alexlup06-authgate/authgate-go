@@ -9,26 +9,30 @@ import (
 )
 
 // RequireAuthWithRefresh returns middleware that enforces authentication and
-// performs a single best-effort refresh via Authgate when needed.
+// performs a single best-effort refresh via AuthGate when needed.
 //
-//   - If the access cookie is missing or invalid, the middleware will attempt to
+// This middleware behaves like RequireAuth, with one additional step:
+//
+//   - If the access cookie is missing or invalid, the middleware attempts to
 //     refresh the session by calling AuthGate's refresh endpoint.
-//   - If refresh succeeds, AuthGate returns Set-Cookie headers for the rotated
-//     refresh token and the new access token.
-//   - The middleware forwards those Set-Cookie headers to the client response
-//     and then verifies the newly issued access token so the CURRENT request can
-//     proceed authenticated.
+//   - If refresh succeeds, AuthGate responds with Set-Cookie headers for the
+//     rotated refresh token and a new access token.
+//   - The middleware forwards those Set-Cookie headers to the client response,
+//     verifies the newly issued access token, and then proceeds with the CURRENT
+//     request authenticated.
 //
 // If refresh is disabled (SDK not configured with AuthGateBaseURL) or refresh
-// fails, the middleware falls back to:
+// fails, the middleware falls back to the same unauthenticated behavior as
+// RequireAuth:
 //
 //   - Browser navigations (Accept: text/html): 302 redirect to login
 //   - HTMX requests (HX-Request: true): 200 with HX-Redirect header
 //   - API / SPA requests: 401 Unauthorized
 //
-// Important:
-//   - Authgate enforces CSRF on refresh, the CSRF token must also be available
-//     on this request so the middleware can forward it.
+// CSRF:
+//
+// If AuthGate enforces CSRF on refresh, the CSRF token must be available on the
+// incoming request so the middleware can forward it.
 func (s *SDK) RequireAuthWithRefresh(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Fast path: access cookie present & valid
@@ -42,10 +46,16 @@ func (s *SDK) RequireAuthWithRefresh(next http.Handler) http.Handler {
 		}
 
 		// Try refresh once (if enabled)
-		if userID, roles, ok := s.tryRefreshAndVerify(w, r); ok {
+		if userID, roles, newCookies, ok := s.tryRefreshAndVerify(w, r); ok {
 			ctx := withUserID(r.Context(), userID)
 			ctx = withRoles(ctx, roles)
-			next.ServeHTTP(w, r.WithContext(ctx))
+
+			// Clone the request and update its Cookie header so any downstream
+			// AuthGate client calls during THIS request see the refreshed cookies.
+			r2 := r.Clone(ctx)
+			applyCookiesToRequest(r2, newCookies)
+
+			next.ServeHTTP(w, r2)
 			return
 		}
 
@@ -53,6 +63,44 @@ func (s *SDK) RequireAuthWithRefresh(next http.Handler) http.Handler {
 		loginURL := LoginPath + "?return_to=" + url.QueryEscape(buildReturnTo(r))
 		unauthenticatedResponse(w, r, loginURL)
 	})
+}
+
+// applyCookiesToRequest overwrites/sets cookies in r based on the cookies returned
+// by AuthGate. It updates the Cookie header so r.Cookie(...) and r.Header.Get("Cookie")
+// reflect the new values.
+//
+// This is used to make refreshed cookies immediately visible to downstream code
+// within the same request lifecycle.
+func applyCookiesToRequest(r *http.Request, newCookies []*http.Cookie) {
+	// Start with existing cookies from the request.
+	jar := map[string]string{}
+	for _, c := range r.Cookies() {
+		jar[c.Name] = c.Value
+	}
+
+	// Overwrite/add cookies from refresh response.
+	for _, c := range newCookies {
+		jar[c.Name] = c.Value
+	}
+
+	// Rebuild Cookie header.
+	var b strings.Builder
+	first := true
+	for name, val := range jar {
+		if !first {
+			b.WriteString("; ")
+		}
+		first = false
+		b.WriteString(name)
+		b.WriteString("=")
+		b.WriteString(val)
+	}
+
+	if b.Len() == 0 {
+		r.Header.Del("Cookie")
+		return
+	}
+	r.Header.Set("Cookie", b.String())
 }
 
 // tryRefreshAndVerify attempts to refresh the session via AuthGate using the
@@ -67,16 +115,16 @@ func (s *SDK) RequireAuthWithRefresh(next http.Handler) http.Handler {
 //
 // It returns ok=false if refresh is disabled, the AuthGate call fails, the
 // response does not contain a usable access cookie, or access verification fails.
-func (s *SDK) tryRefreshAndVerify(w http.ResponseWriter, r *http.Request) (uuid.UUID, []string, bool) {
+func (s *SDK) tryRefreshAndVerify(w http.ResponseWriter, r *http.Request) (uuid.UUID, []string, []*http.Cookie, bool) {
 	// Refresh disabled unless configured explicitly.
 	if s.authGateBaseURL == "" {
-		return uuid.Nil, nil, false
+		return uuid.Nil, nil, nil, false
 	}
 
 	reqURL := s.authGateBaseURL + RefreshPath + "?audience=" + s.verifier.audience
 	req, err := http.NewRequestWithContext(r.Context(), http.MethodPost, reqURL, nil)
 	if err != nil {
-		return uuid.Nil, nil, false
+		return uuid.Nil, nil, nil, false
 	}
 
 	// Forward cookies from the incoming request to AuthGate.
@@ -86,27 +134,25 @@ func (s *SDK) tryRefreshAndVerify(w http.ResponseWriter, r *http.Request) (uuid.
 	}
 
 	// If CSRF cookie is present on the incoming request, attach it as header.
-	// (If your CSRF cookie is Path=/auth, it will NOT be present here and refresh
-	// will fail if AuthGate enforces CSRF.)
 	if token, ok := CSRFToken(r); ok {
 		AttachCSRF(req, token)
 	}
 
 	resp, err := s.httpClient.Do(req)
 	if err != nil {
-		return uuid.Nil, nil, false
+		return uuid.Nil, nil, nil, false
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
-		return uuid.Nil, nil, false
+		return uuid.Nil, nil, nil, false
 	}
 
 	// Forward raw Set-Cookie headers exactly as AuthGate sent them.
 	// Note: multiple Set-Cookie headers are expected (access + refresh, etc.).
 	rawSetCookies := resp.Header.Values("Set-Cookie")
 	if len(rawSetCookies) == 0 {
-		return uuid.Nil, nil, false
+		return uuid.Nil, nil, nil, false
 	}
 	for _, sc := range rawSetCookies {
 		w.Header().Add("Set-Cookie", sc)
@@ -123,15 +169,17 @@ func (s *SDK) tryRefreshAndVerify(w http.ResponseWriter, r *http.Request) (uuid.
 		}
 	}
 	if accessToken == "" {
-		return uuid.Nil, nil, false
+		return uuid.Nil, nil, nil, false
 	}
 
 	uid, rs, err := s.verifier.verify(accessToken)
 	if err != nil {
-		return uuid.Nil, nil, false
+		return uuid.Nil, nil, nil, false
 	}
 
-	return uid, rs, true
+	// Return all cookies set by AuthGate so the middleware can apply them to the
+	// cloned request (same-request correctness for downstream AuthGate calls).
+	return uid, rs, resp.Cookies(), true
 }
 
 // RequireAuth returns middleware that enforces authentication.

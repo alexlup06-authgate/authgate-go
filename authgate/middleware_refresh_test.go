@@ -134,10 +134,7 @@ func TestRequireAuthWithRefresh_MissingAccess_RefreshOK_ForwardsSetCookie_Authen
 		gotCookieHeader = r.Header.Get("Cookie")
 		gotCSRFHeader = r.Header.Get(CSRFHeaderName)
 
-		// Issue new cookies
-		// (Access token must be valid per sdk verifier to allow THIS request through.)
-		// We'll sign with the same test key used in SDK.
-		// Note: the SDK reads AccessCookieName from resp.Cookies(), so this must parse.
+		// Issue new cookies (access must verify).
 		access := signAccessToken(t, map[string][]byte{"test-kid": []byte("super-secret")}, userID, []string{"authgate:user"}, time.Hour)
 
 		http.SetCookie(w, &http.Cookie{
@@ -222,6 +219,69 @@ func TestRequireAuthWithRefresh_MissingAccess_RefreshOK_ForwardsSetCookie_Authen
 	}
 }
 
+// New test for v0.4.1 behavior: after refresh, the middleware must update the
+// request's Cookie header (on a cloned request) so downstream code sees the new
+// access cookie during the same request.
+func TestRequireAuthWithRefresh_MissingAccess_RefreshOK_UpdatesRequestCookieHeader(t *testing.T) {
+	userID := uuid.New()
+
+	var issuedAccess string
+	authGate := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		issuedAccess = signAccessToken(
+			t,
+			map[string][]byte{"test-kid": []byte("super-secret")},
+			userID,
+			[]string{"authgate:user"},
+			time.Hour,
+		)
+
+		http.SetCookie(w, &http.Cookie{
+			Name:     AccessCookieName,
+			Value:    issuedAccess,
+			Path:     "/",
+			HttpOnly: true,
+		})
+		http.SetCookie(w, &http.Cookie{
+			Name:     "authgate_refresh",
+			Value:    "rotated-refresh",
+			Path:     "/",
+			HttpOnly: true,
+		})
+
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(authGate.Close)
+
+	sdk, _ := newTestSDKWithRefresh(t, authGate.URL, authGate.Client())
+
+	h := sdk.RequireAuthWithRefresh(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// This is the assertion: downstream code should see the refreshed cookie value.
+		c, err := r.Cookie(AccessCookieName)
+		if err != nil {
+			t.Fatalf("expected access cookie to be present on request after refresh, got err=%v", err)
+		}
+		if c.Value != issuedAccess {
+			t.Fatalf("expected access cookie value to be updated, got %q want %q", c.Value, issuedAccess)
+		}
+
+		// And the raw Cookie header should include the updated cookie as well.
+		if got := r.Header.Get("Cookie"); !strings.Contains(got, AccessCookieName+"="+issuedAccess) {
+			t.Fatalf("expected Cookie header to contain updated access token, got %q", got)
+		}
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/private", nil)
+	req.Header.Set("Accept", "text/html")
+	req.AddCookie(&http.Cookie{Name: "authgate_refresh", Value: "rt1", Path: "/"})
+
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+}
+
 func TestRequireAuthWithRefresh_InvalidAccess_RefreshFails_FallsBack_API401(t *testing.T) {
 	authGate := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Simulate refresh failure (expired/invalid refresh token)
@@ -253,7 +313,7 @@ func TestRequireAuthWithRefresh_RefreshDisabled_FallsBack_BrowserRedirect(t *tes
 	sdk := newTestSDK(t) // refresh disabled because baseURL not configured
 
 	h := sdk.RequireAuthWithRefresh(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		t.Fatal("handler should not be called")
+		t.Fatal("handler should not have been called")
 	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/protected?x=1", nil)
