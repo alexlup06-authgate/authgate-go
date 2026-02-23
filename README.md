@@ -18,8 +18,8 @@ This SDK is designed to:
 
 - expose **facts**, not policy
 - avoid hidden behavior
-- avoid implicit network calls
 - keep authentication and authorization concerns separate
+- require explicit configuration for any network behavior
 
 AuthGate itself remains the single source of truth for authentication,
 sessions, refresh logic, CSRF enforcement, and security invariants.
@@ -60,11 +60,11 @@ These helpers are **strict by design**:
 
 - Does **not** authenticate users
 - Does **not** manage sessions
-- Does **not** refresh tokens
-- Does **not** set, clear, or modify cookies
-- Does **not** validate CSRF tokens
 - Does **not** enforce authorization policy
 - Does **not** perform background or implicit network calls
+
+> Exception: `RequireAuthWithRefresh` can perform a best-effort refresh call,
+> but only if explicitly enabled via configuration.
 
 All authentication, session management, refresh logic, and CSRF enforcement live
 exclusively in **AuthGate itself**, not in this SDK.
@@ -104,6 +104,46 @@ Multiple keys may be provided to support key rotation.
 
 ---
 
+## Optional configuration (refresh support)
+
+The SDK can optionally perform a single best-effort refresh when an access token
+is missing or invalid.
+
+To enable refresh, configure the AuthGate base URL:
+
+```go
+sdk, err := authgate.New(authgate.Config{
+	Issuer:   "https://example.com/auth",
+	Audience: "app",
+	Keys: map[string][]byte{
+		"key-id": []byte("secret"),
+	},
+
+	// Enables RequireAuthWithRefresh.
+	AuthGateBaseURL: "https://example.com",
+})
+```
+
+Notes:
+
+- Refresh is performed by calling AuthGate’s refresh endpoint and forwarding
+  the incoming request cookies.
+- AuthGate remains the only component that knows refresh semantics. The SDK only
+  triggers refresh and re-verifies the new access token.
+- If `AuthGateBaseURL` is not set, refresh behavior is disabled.
+
+A custom `http.Client` may be provided if needed:
+
+```go
+sdk, err := authgate.New(authgate.Config{
+	// ...
+	AuthGateBaseURL: "https://example.com",
+	HTTPClient:      customHTTPClient,
+})
+```
+
+---
+
 ## HTTP middleware
 
 ### Require authentication
@@ -125,6 +165,30 @@ request type:
   Responds with `401 Unauthorized` (no redirect)
 
 On success, authentication facts are injected into the request context.
+
+---
+
+### Require authentication with refresh (recommended for SSR/HTMX)
+
+```go
+r.Use(sdk.RequireAuthWithRefresh)
+```
+
+`RequireAuthWithRefresh` behaves like `RequireAuth`, but with one additional step:
+
+- If the access cookie is missing or invalid, the middleware attempts a
+  **single best-effort refresh** via AuthGate.
+- If refresh succeeds, AuthGate returns `Set-Cookie` headers for the rotated
+  refresh token and new access token.
+- The middleware forwards those `Set-Cookie` headers to the client response and
+  verifies the newly issued access token so the **current request** can proceed
+  authenticated.
+
+If refresh fails (or is disabled), it falls back to the same unauthenticated
+behavior as `RequireAuth` (redirect / HX-Redirect / 401 depending on request type).
+
+This middleware is especially useful for SSR and HTMX apps, where redirect-based
+refresh can cause state loss or dropped mutation requests.
 
 ---
 

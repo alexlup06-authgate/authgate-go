@@ -1,5 +1,7 @@
 package authgate
 
+import "net/http"
+
 // Config defines the configuration required to initialize the AuthGate SDK.
 //
 // All fields are required. The SDK performs strict validation when calling
@@ -22,4 +24,14 @@ type Config struct {
 	// The key ID must match the "kid" header of the JWT. Multiple keys may be
 	// provided to support key rotation.
 	Keys map[string][]byte
+
+	// AuthGateBaseURL enables refresh behavior in RequireAuth.
+	//
+	// Example: "https://example.com", or if you use Docker, e.g.: "authgate:3000"
+	// If empty, RequireAuth will NOT attempt refresh and will behave as today.
+	AuthGateBaseURL string
+
+	// HTTPClient is used for outbound calls to AuthGate (refresh).
+	// If nil, http.DefaultClient is used.
+	HTTPClient *http.Client
 }

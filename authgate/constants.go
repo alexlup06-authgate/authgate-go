@@ -15,6 +15,12 @@ const (
 	// return_to query parameter appended.
 	LoginPath = "/auth/login"
 
+	// RefreshPath is the AuthGate endpoint that rotates refresh cookies and
+	// sets a new access cookie.
+	//
+	// It should be cookie-based and respond with Set-Cookie headers.
+	RefreshPath = "/auth/api/v1/sessions/refresh"
+
 	// clockSkew defines the allowed clock skew when validating JWT timestamps.
 	//
 	// This accounts for small differences between the AuthGate server's clock

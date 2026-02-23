@@ -2,6 +2,8 @@ package authgate
 
 import (
 	"errors"
+	"net/http"
+	"strings"
 )
 
 // SDK is the main entry point for the AuthGate Go SDK.
@@ -10,6 +12,9 @@ import (
 // access tokens and to power the provided HTTP middleware.
 type SDK struct {
 	verifier *verifier
+
+	authGateBaseURL string
+	httpClient      *http.Client
 }
 
 // New initializes a new AuthGate SDK instance using the provided configuration.
@@ -20,9 +25,11 @@ type SDK struct {
 // Example:
 //
 //	sdk, err := authgate.New(authgate.Config{
-//		Issuer:   "https://example.com",
-//		Audience: "app",
-//		Keys:     keys,
+//		Issuer:          "https://example.com",
+//		Audience:        "app",
+//		Keys:            keys,
+//		AuthgateBaseURL: "authgate:3000"
+//		HTTPCliet:       nil
 //	})
 func New(cfg Config) (*SDK, error) {
 	if cfg.Issuer == "" {
@@ -42,5 +49,14 @@ func New(cfg Config) (*SDK, error) {
 		return nil, err
 	}
 
-	return &SDK{verifier: v}, nil
+	hc := cfg.HTTPClient
+	if hc == nil {
+		hc = http.DefaultClient
+	}
+
+	return &SDK{
+		verifier:        v,
+		authGateBaseURL: strings.TrimRight(cfg.AuthGateBaseURL, "/"),
+		httpClient:      hc,
+	}, nil
 }
