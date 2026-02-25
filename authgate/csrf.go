@@ -41,7 +41,7 @@ func LogoutFormDataFromRequest(
 		return LogoutFormData{}, false
 	}
 
-	action := "/auth/logout"
+	action := "/auth/sessions/logout"
 	if redirect != "" {
 		action += "?return_to=" + url.QueryEscape(redirect)
 	}
