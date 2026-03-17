@@ -74,7 +74,7 @@ exclusively in **Authara itself**, not in this SDK.
 ## Installation
 
 ```bash
-go get github.com/alexlupatsiy/authara-go
+go get github.com/authara-org/authara-go
 ```
 
 ---
