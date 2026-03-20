@@ -40,4 +40,42 @@ const (
 	// CSRFFormField is the name of the hidden form field used to submit the
 	// CSRF token in server-rendered (SSR) applications.
 	CSRFFormField = "csrf_token"
+
+	// WebhookSignatureHeader is the HTTP header that carries the HMAC signature
+	// for webhook requests sent by Authara.
+	//
+	// Applications must verify this signature to ensure the request originates
+	// from a trusted Authara instance.
+	WebhookSignatureHeader = "X-Authara-Signature"
+
+	// WebhookEventHeader is the HTTP header that identifies the event type
+	// of the webhook (e.g. user.created).
+	//
+	// This allows handlers to quickly route events without parsing the body.
+	WebhookEventHeader = "X-Authara-Event"
+
+	// WebhookDeliveryHeader is the HTTP header that contains the unique
+	// delivery ID for the webhook request.
+	//
+	// This ID can be used for idempotency and deduplication of events.
+	WebhookDeliveryHeader = "X-Authara-Delivery"
+
+	// WebhookSignaturePrefix is the prefix used in the signature header value.
+	//
+	// The full header value has the format:
+	//
+	//   sha256=<hex-encoded-hmac>
+	//
+	// This prefix must be validated before verifying the signature.
+	WebhookSignaturePrefix = "sha256="
+
+	// WebhookEventUserCreated is emitted when a new user account is created.
+	//
+	// The payload contains a UserCreatedData object.
+	WebhookEventUserCreated = "user.created"
+
+	// WebhookEventUserDeleted is emitted when a user account is deleted.
+	//
+	// The payload contains a UserDeletedData object.
+	WebhookEventUserDeleted = "user.deleted"
 )

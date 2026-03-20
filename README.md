@@ -319,13 +319,59 @@ CSRF token generation and validation are fully owned by Authara.
 
 ---
 
-## Compatibility
+## Webhook handling
 
-- Compatible with Authara v1.x
-- Safe for SSR, HTMX, and API-based applications
+The SDK provides helpers for handling **Authara webhooks** in a safe and
+explicit way.
+
+It supports:
+
+- signature verification (HMAC-SHA256)
+- event parsing
+- typed payload decoding
+
+---
+
+### Basic usage
+
+```go
+func autharaWebhook(w http.ResponseWriter, r *http.Request) {
+	handler := &authara.WebhookHandler{
+		Secret: os.Getenv("AUTHARA_WEBHOOK_SECRET"),
+	}
+
+	evt, err := handler.Handle(w, r)
+	if err != nil {
+		return
+	}
+
+	switch evt.Type {
+	case authara.WebhookEventUserCreated:
+		data, _ := authara.DecodeWebhookData[authara.UserCreatedData](evt)
+		// handle user created
+
+	case authara.WebhookEventUserDeleted:
+		data, _ := authara.DecodeWebhookData[authara.UserDeletedData](evt)
+		// handle user deleted
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+```
+
+---
+
+### Design notes
+
+- The SDK **verifies signatures before parsing**
+- Event payloads are exposed as **raw JSON + typed decoding helpers**
+- No retries, queues, or background processing are included
+
+Webhook delivery semantics are defined by **Authara**, not the SDK.
 
 ---
 
 ## License
 
 MIT
+```
