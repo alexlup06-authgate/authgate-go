@@ -31,7 +31,7 @@ func TestGetCurrentUser_OK(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{
-			"id": "user-1",
+			"id": "11111111-1111-1111-1111-111111111111",
 			"email": "user@example.com",
 			"username": "user"
 		}`))
@@ -54,7 +54,7 @@ func TestGetCurrentUser_OK(t *testing.T) {
 		t.Fatal("expected user, got nil")
 	}
 
-	if user.ID != "user-1" {
+	if user.ID.String() != "11111111-1111-1111-1111-111111111111" {
 		t.Errorf("unexpected id: %s", user.ID)
 	}
 	if user.Email != "user@example.com" {

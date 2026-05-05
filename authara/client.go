@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 // ClientOption configures a Client.
@@ -158,7 +160,7 @@ func DoJSONRequest[T any](
 // This struct mirrors the response of the Authara `/auth/user` endpoint and
 // intentionally contains only identity data, not authorization facts.
 type CurrentUser struct {
-	ID        string    `json:"id"`
+	ID        uuid.UUID `json:"id"`
 	Email     string    `json:"email"`
 	Username  string    `json:"username"`
 	Disabled  bool      `json:"disabled"`
