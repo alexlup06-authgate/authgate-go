@@ -4,8 +4,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-
-	"github.com/google/uuid"
 )
 
 // RequireAuthWithRefresh returns middleware that enforces authentication and
@@ -35,20 +33,17 @@ import (
 // incoming request so the middleware can forward it.
 func (s *SDK) RequireAuthWithRefresh(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Fast path: access cookie present & valid
-		if c, err := r.Cookie(AccessCookieName); err == nil && c.Value != "" {
-			if userID, roles, err := s.verifier.verify(c.Value); err == nil {
-				ctx := withUserID(r.Context(), userID)
-				ctx = withRoles(ctx, roles)
-				next.ServeHTTP(w, r.WithContext(ctx))
+		// Fast path: access token present & valid
+		if accessToken, ok := accessTokenFromRequest(r); ok {
+			if identity, err := s.verifier.verify(accessToken); err == nil {
+				next.ServeHTTP(w, r.WithContext(withAccessIdentity(r.Context(), identity)))
 				return
 			}
 		}
 
 		// Try refresh once (if enabled)
-		if userID, roles, newCookies, ok := s.tryRefreshAndVerify(w, r); ok {
-			ctx := withUserID(r.Context(), userID)
-			ctx = withRoles(ctx, roles)
+		if identity, newCookies, ok := s.tryRefreshAndVerify(w, r); ok {
+			ctx := withAccessIdentity(r.Context(), identity)
 
 			// Clone the request and update its Cookie header so any downstream
 			// Authara client calls during THIS request see the refreshed cookies.
@@ -115,16 +110,16 @@ func applyCookiesToRequest(r *http.Request, newCookies []*http.Cookie) {
 //
 // It returns ok=false if refresh is disabled, the Authara call fails, the
 // response does not contain a usable access cookie, or access verification fails.
-func (s *SDK) tryRefreshAndVerify(w http.ResponseWriter, r *http.Request) (uuid.UUID, []string, []*http.Cookie, bool) {
+func (s *SDK) tryRefreshAndVerify(w http.ResponseWriter, r *http.Request) (accessIdentity, []*http.Cookie, bool) {
 	// Refresh disabled unless configured explicitly.
 	if s.autharaBaseURL == "" {
-		return uuid.Nil, nil, nil, false
+		return accessIdentity{}, nil, false
 	}
 
 	reqURL := s.autharaBaseURL + RefreshPath + "?audience=" + s.verifier.audience
 	req, err := http.NewRequestWithContext(r.Context(), http.MethodPost, reqURL, nil)
 	if err != nil {
-		return uuid.Nil, nil, nil, false
+		return accessIdentity{}, nil, false
 	}
 
 	// Forward cookies from the incoming request to Authara.
@@ -140,19 +135,19 @@ func (s *SDK) tryRefreshAndVerify(w http.ResponseWriter, r *http.Request) (uuid.
 
 	resp, err := s.httpClient.Do(req)
 	if err != nil {
-		return uuid.Nil, nil, nil, false
+		return accessIdentity{}, nil, false
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
-		return uuid.Nil, nil, nil, false
+		return accessIdentity{}, nil, false
 	}
 
 	// Forward raw Set-Cookie headers exactly as Authara sent them.
 	// Note: multiple Set-Cookie headers are expected (access + refresh, etc.).
 	rawSetCookies := resp.Header.Values("Set-Cookie")
 	if len(rawSetCookies) == 0 {
-		return uuid.Nil, nil, nil, false
+		return accessIdentity{}, nil, false
 	}
 	for _, sc := range rawSetCookies {
 		w.Header().Add("Set-Cookie", sc)
@@ -169,17 +164,17 @@ func (s *SDK) tryRefreshAndVerify(w http.ResponseWriter, r *http.Request) (uuid.
 		}
 	}
 	if accessToken == "" {
-		return uuid.Nil, nil, nil, false
+		return accessIdentity{}, nil, false
 	}
 
-	uid, rs, err := s.verifier.verify(accessToken)
+	identity, err := s.verifier.verify(accessToken)
 	if err != nil {
-		return uuid.Nil, nil, nil, false
+		return accessIdentity{}, nil, false
 	}
 
 	// Return all cookies set by Authara so the middleware can apply them to the
 	// cloned request (same-request correctness for downstream Authara calls).
-	return uid, rs, resp.Cookies(), true
+	return identity, resp.Cookies(), true
 }
 
 // RequireAuth returns middleware that enforces authentication.
@@ -201,23 +196,21 @@ func (s *SDK) tryRefreshAndVerify(w http.ResponseWriter, r *http.Request) (uuid.
 // into the request context before calling the next handler.
 func (s *SDK) RequireAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		cookie, err := r.Cookie(AccessCookieName)
+		accessToken, ok := accessTokenFromRequest(r)
+		if !ok {
+			loginURL := LoginPath + "?return_to=" + url.QueryEscape(buildReturnTo(r))
+			unauthenticatedResponse(w, r, loginURL)
+			return
+		}
+
+		identity, err := s.verifier.verify(accessToken)
 		if err != nil {
 			loginURL := LoginPath + "?return_to=" + url.QueryEscape(buildReturnTo(r))
 			unauthenticatedResponse(w, r, loginURL)
 			return
 		}
 
-		userID, roles, err := s.verifier.verify(cookie.Value)
-		if err != nil {
-			loginURL := LoginPath + "?return_to=" + url.QueryEscape(buildReturnTo(r))
-			unauthenticatedResponse(w, r, loginURL)
-			return
-		}
-
-		ctx := withUserID(r.Context(), userID)
-		ctx = withRoles(ctx, roles)
-		next.ServeHTTP(w, r.WithContext(ctx))
+		next.ServeHTTP(w, r.WithContext(withAccessIdentity(r.Context(), identity)))
 	})
 }
 
@@ -266,6 +259,28 @@ func isAPICall(r *http.Request) bool {
 	return true
 }
 
+func accessTokenFromRequest(r *http.Request) (string, bool) {
+	if token, ok := bearerToken(r); ok {
+		return token, true
+	}
+
+	cookie, err := r.Cookie(AccessCookieName)
+	if err != nil || cookie.Value == "" {
+		return "", false
+	}
+	return cookie.Value, true
+}
+
+func bearerToken(r *http.Request) (string, bool) {
+	scheme, token, ok := strings.Cut(strings.TrimSpace(r.Header.Get("Authorization")), " ")
+	if !ok || !strings.EqualFold(scheme, "Bearer") {
+		return "", false
+	}
+
+	token = strings.TrimSpace(token)
+	return token, token != ""
+}
+
 // TryAuth returns middleware that attempts authentication if an access
 // token is present, but does not enforce it.
 //
@@ -277,13 +292,10 @@ func isAPICall(r *http.Request) bool {
 // authentication is optional.
 func (s *SDK) TryAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		cookie, err := r.Cookie(AccessCookieName)
-		if err == nil {
-			userID, roles, err := s.verifier.verify(cookie.Value)
+		if accessToken, ok := accessTokenFromRequest(r); ok {
+			identity, err := s.verifier.verify(accessToken)
 			if err == nil {
-				ctx := withUserID(r.Context(), userID)
-				ctx = withRoles(ctx, roles)
-				r = r.WithContext(ctx)
+				r = r.WithContext(withAccessIdentity(r.Context(), identity))
 			}
 		}
 

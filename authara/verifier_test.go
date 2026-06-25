@@ -46,10 +46,13 @@ func TestVerify_ValidToken(t *testing.T) {
 	v, keys := newTestVerifier(t)
 
 	userID := uuid.New()
+	orgID := uuid.New()
 	now := time.Now()
 
 	claims := accessClaims{
-		SessionID: "session-123",
+		SessionID: uuid.New(),
+		OrgID:     orgID,
+		OrgRole:   "owner",
 		Roles:     []string{"authara:user"},
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    "https://auth.example.com",
@@ -62,17 +65,23 @@ func TestVerify_ValidToken(t *testing.T) {
 
 	token := signToken(t, claims, keys["test-kid"])
 
-	gotUserID, roles, err := v.verify(token)
+	identity, err := v.verify(token)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if gotUserID != userID {
-		t.Fatalf("expected userID %v, got %v", userID, gotUserID)
+	if identity.UserID != userID {
+		t.Fatalf("expected userID %v, got %v", userID, identity.UserID)
 	}
 
-	if len(roles) != 1 || roles[0] != "authara:user" {
-		t.Fatalf("unexpected roles: %v", roles)
+	if identity.OrganizationID != orgID {
+		t.Fatalf("expected orgID %v, got %v", orgID, identity.OrganizationID)
+	}
+	if identity.OrganizationRole != "owner" {
+		t.Fatalf("expected org role owner, got %q", identity.OrganizationRole)
+	}
+	if len(identity.Roles) != 1 || identity.Roles[0] != "authara:user" {
+		t.Fatalf("unexpected roles: %v", identity.Roles)
 	}
 }
 
@@ -80,7 +89,9 @@ func TestVerify_ExpiredToken(t *testing.T) {
 	v, keys := newTestVerifier(t)
 
 	claims := accessClaims{
-		SessionID: "session-123",
+		SessionID: uuid.New(),
+		OrgID:     uuid.New(),
+		OrgRole:   "owner",
 		Roles:     []string{"authara:user"},
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    "https://auth.example.com",
@@ -92,7 +103,7 @@ func TestVerify_ExpiredToken(t *testing.T) {
 
 	token := signToken(t, claims, keys["test-kid"])
 
-	_, _, err := v.verify(token)
+	_, err := v.verify(token)
 	if err != ErrTokenExpired {
 		t.Fatalf("expected ErrTokenExpired, got %v", err)
 	}
@@ -102,7 +113,9 @@ func TestVerify_WrongAudience(t *testing.T) {
 	v, keys := newTestVerifier(t)
 
 	claims := accessClaims{
-		SessionID: "session-123",
+		SessionID: uuid.New(),
+		OrgID:     uuid.New(),
+		OrgRole:   "owner",
 		Roles:     []string{"authara:user"},
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    "https://auth.example.com",
@@ -114,7 +127,7 @@ func TestVerify_WrongAudience(t *testing.T) {
 
 	token := signToken(t, claims, keys["test-kid"])
 
-	_, _, err := v.verify(token)
+	_, err := v.verify(token)
 	if err != ErrInvalidToken {
 		t.Fatalf("expected ErrInvalidToken, got %v", err)
 	}
@@ -124,7 +137,9 @@ func TestVerify_InvalidRoleNamespace(t *testing.T) {
 	v, keys := newTestVerifier(t)
 
 	claims := accessClaims{
-		SessionID: "session-123",
+		SessionID: uuid.New(),
+		OrgID:     uuid.New(),
+		OrgRole:   "owner",
 		Roles:     []string{"user"},
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    "https://auth.example.com",
@@ -136,9 +151,31 @@ func TestVerify_InvalidRoleNamespace(t *testing.T) {
 
 	token := signToken(t, claims, keys["test-kid"])
 
-	_, _, err := v.verify(token)
+	_, err := v.verify(token)
 	if err != ErrInvalidRoleNamespace {
 		t.Fatalf("expected ErrInvalidRoleNamespace, got %v", err)
+	}
+}
+
+func TestVerify_MissingOrganizationClaims(t *testing.T) {
+	v, keys := newTestVerifier(t)
+
+	claims := accessClaims{
+		SessionID: uuid.New(),
+		Roles:     []string{"authara:user"},
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer:    "https://auth.example.com",
+			Audience:  []string{"app"},
+			Subject:   uuid.New().String(),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
+		},
+	}
+
+	token := signToken(t, claims, keys["test-kid"])
+
+	_, err := v.verify(token)
+	if err != ErrInvalidToken {
+		t.Fatalf("expected ErrInvalidToken, got %v", err)
 	}
 }
 
@@ -146,7 +183,9 @@ func TestVerify_UnknownKeyID(t *testing.T) {
 	v, _ := newTestVerifier(t)
 
 	claims := accessClaims{
-		SessionID: "session-123",
+		SessionID: uuid.New(),
+		OrgID:     uuid.New(),
+		OrgRole:   "owner",
 		Roles:     []string{"authara:user"},
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    "https://auth.example.com",
@@ -164,7 +203,7 @@ func TestVerify_UnknownKeyID(t *testing.T) {
 		t.Fatalf("failed to sign token: %v", err)
 	}
 
-	_, _, err = v.verify(s)
+	_, err = v.verify(s)
 	if err != ErrInvalidToken {
 		t.Fatalf("expected ErrInvalidToken, got %v", err)
 	}

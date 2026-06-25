@@ -43,7 +43,9 @@ func signAccessToken(t *testing.T, keys map[string][]byte, userID uuid.UUID, rol
 	now := time.Now()
 
 	claims := accessClaims{
-		SessionID: "session-123",
+		SessionID: uuid.New(),
+		OrgID:     uuid.New(),
+		OrgRole:   "owner",
 		Roles:     roles,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    "https://auth.example.com",

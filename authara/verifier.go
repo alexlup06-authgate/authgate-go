@@ -9,10 +9,19 @@ import (
 )
 
 type accessClaims struct {
-	SessionID string   `json:"sid"`
-	Roles     []string `json:"roles"`
+	SessionID uuid.UUID `json:"sid"`
+	OrgID     uuid.UUID `json:"org_id"`
+	OrgRole   string    `json:"org_role"`
+	Roles     []string  `json:"roles"`
 
 	jwt.RegisteredClaims
+}
+
+type accessIdentity struct {
+	UserID           uuid.UUID
+	OrganizationID   uuid.UUID
+	OrganizationRole string
+	Roles            []string
 }
 
 type verifier struct {
@@ -29,7 +38,7 @@ func newVerifier(cfg Config) (*verifier, error) {
 	}, nil
 }
 
-func (v *verifier) verify(tokenString string) (uuid.UUID, []string, error) {
+func (v *verifier) verify(tokenString string) (accessIdentity, error) {
 	parser := jwt.NewParser(
 		jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Name}),
 		jwt.WithLeeway(clockSkew),
@@ -44,32 +53,41 @@ func (v *verifier) verify(tokenString string) (uuid.UUID, []string, error) {
 	)
 	if err != nil {
 		if errors.Is(err, jwt.ErrTokenExpired) {
-			return uuid.Nil, []string{}, ErrTokenExpired
+			return accessIdentity{}, ErrTokenExpired
 		}
-		return uuid.Nil, []string{}, ErrInvalidToken
+		return accessIdentity{}, ErrInvalidToken
 	}
 
 	claims, ok := token.Claims.(*accessClaims)
 	if !ok || !token.Valid {
-		return uuid.Nil, []string{}, ErrInvalidToken
+		return accessIdentity{}, ErrInvalidToken
 	}
 
-	if claims.Subject == "" || claims.SessionID == "" {
-		return uuid.Nil, []string{}, ErrInvalidToken
+	orgRole := strings.TrimSpace(claims.OrgRole)
+	if claims.Subject == "" ||
+		claims.SessionID == uuid.Nil ||
+		claims.OrgID == uuid.Nil ||
+		orgRole == "" {
+		return accessIdentity{}, ErrInvalidToken
 	}
 
 	userID, err := uuid.Parse(claims.Subject)
 	if err != nil {
-		return uuid.Nil, []string{}, ErrInvalidToken
+		return accessIdentity{}, ErrInvalidToken
 	}
 
 	for _, role := range claims.Roles {
 		if !strings.HasPrefix(role, "authara:") {
-			return uuid.Nil, []string{}, ErrInvalidRoleNamespace
+			return accessIdentity{}, ErrInvalidRoleNamespace
 		}
 	}
 
-	return userID, claims.Roles, nil
+	return accessIdentity{
+		UserID:           userID,
+		OrganizationID:   claims.OrgID,
+		OrganizationRole: orgRole,
+		Roles:            claims.Roles,
+	}, nil
 }
 
 func (v *verifier) keyFunc(t *jwt.Token) (any, error) {

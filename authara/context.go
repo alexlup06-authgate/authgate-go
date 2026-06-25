@@ -8,11 +8,23 @@ import (
 
 type userIDKeyType struct{}
 type rolesKeyType struct{}
+type organizationIDKeyType struct{}
+type organizationRoleKeyType struct{}
 
 var (
-	userIDKey = userIDKeyType{}
-	rolesKey  = rolesKeyType{}
+	userIDKey           = userIDKeyType{}
+	rolesKey            = rolesKeyType{}
+	organizationIDKey   = organizationIDKeyType{}
+	organizationRoleKey = organizationRoleKeyType{}
 )
+
+func withAccessIdentity(ctx context.Context, identity accessIdentity) context.Context {
+	ctx = withUserID(ctx, identity.UserID)
+	ctx = withRoles(ctx, identity.Roles)
+	ctx = withOrganizationID(ctx, identity.OrganizationID)
+	ctx = withOrganizationRole(ctx, identity.OrganizationRole)
+	return ctx
+}
 
 // withUserID returns a new context containing the authenticated user's ID.
 //
@@ -53,4 +65,24 @@ func withRoles(ctx context.Context, roles []string) context.Context {
 func RolesFromContext(ctx context.Context) ([]string, bool) {
 	roles, ok := ctx.Value(rolesKey).([]string)
 	return roles, ok
+}
+
+func withOrganizationID(ctx context.Context, id uuid.UUID) context.Context {
+	return context.WithValue(ctx, organizationIDKey, id)
+}
+
+// OrganizationIDFromContext extracts the active organization ID from the context.
+func OrganizationIDFromContext(ctx context.Context) (uuid.UUID, bool) {
+	id, ok := ctx.Value(organizationIDKey).(uuid.UUID)
+	return id, ok
+}
+
+func withOrganizationRole(ctx context.Context, role string) context.Context {
+	return context.WithValue(ctx, organizationRoleKey, role)
+}
+
+// OrganizationRoleFromContext extracts the user's role in the active organization.
+func OrganizationRoleFromContext(ctx context.Context) (string, bool) {
+	role, ok := ctx.Value(organizationRoleKey).(string)
+	return role, ok
 }

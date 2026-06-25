@@ -5,6 +5,9 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/google/uuid"
 )
 
 func newTestSDK(t *testing.T) *SDK {
@@ -95,6 +98,30 @@ func TestRequireAuth_NoCookie_APIReturns401(t *testing.T) {
 
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("expected status 401, got %d", rec.Code)
+	}
+}
+
+func TestRequireAuth_BearerTokenAuthenticates(t *testing.T) {
+	sdk, keys := newTestSDKWithRefresh(t, "", nil)
+	userID := uuid.New()
+	access := signAccessToken(t, keys, userID, []string{"authara:user"}, time.Hour)
+
+	handler := sdk.RequireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotID, ok := UserIDFromContext(r.Context())
+		if !ok || gotID != userID {
+			t.Fatalf("expected userID %v, got %v (ok=%v)", userID, gotID, ok)
+		}
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/api/mobile/v1/sites", nil)
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Authorization", "Bearer "+access)
+
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
 	}
 }
 
