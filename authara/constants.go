@@ -74,8 +74,23 @@ const (
 	// The payload contains a UserCreatedData object.
 	WebhookEventUserCreated = "user.created"
 
+	// WebhookEventUserUpdated is emitted when a user account is updated.
+	WebhookEventUserUpdated = "user.updated"
+
 	// WebhookEventUserDeleted is emitted when a user account is deleted.
 	//
 	// The payload contains a UserDeletedData object.
 	WebhookEventUserDeleted = "user.deleted"
+
+	WebhookEventOrganizationCreated = "organization.created"
+	WebhookEventOrganizationUpdated = "organization.updated"
+	WebhookEventOrganizationDeleted = "organization.deleted"
+
+	WebhookEventOrganizationMembershipCreated = "organization.membership.created"
+	WebhookEventOrganizationMembershipUpdated = "organization.membership.updated"
+	WebhookEventOrganizationMembershipDeleted = "organization.membership.deleted"
+
+	WebhookEventOrganizationInvitationCreated  = "organization.invitation.created"
+	WebhookEventOrganizationInvitationAccepted = "organization.invitation.accepted"
+	WebhookEventOrganizationInvitationRevoked  = "organization.invitation.revoked"
 )

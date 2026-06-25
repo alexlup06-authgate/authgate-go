@@ -39,10 +39,60 @@ type UserCreatedData struct {
 	UserID string `json:"user_id"`
 }
 
+// UserUpdatedData is the payload for the "user.updated" event.
+type UserUpdatedData struct {
+	UserID string `json:"user_id"`
+}
+
 // UserDeletedData is the payload for the "user.deleted" event.
 //
 // It contains information about the deleted user.
 type UserDeletedData struct {
 	// UserID is the unique identifier of the deleted user.
 	UserID string `json:"user_id"`
+}
+
+// OrganizationData is the payload for organization lifecycle events.
+type OrganizationData struct {
+	OrganizationID  string  `json:"organization_id"`
+	Name            string  `json:"name"`
+	Kind            string  `json:"kind"`
+	CreatedByUserID *string `json:"created_by_user_id"`
+}
+
+// OrganizationMembershipData is the payload for organization membership events.
+type OrganizationMembershipData struct {
+	OrganizationID string `json:"organization_id"`
+	UserID         string `json:"user_id"`
+	Role           string `json:"role"`
+}
+
+// OrganizationInvitationCreatedData is the payload for "organization.invitation.created".
+type OrganizationInvitationCreatedData struct {
+	InvitationID    string    `json:"invitation_id"`
+	OrganizationID  string    `json:"organization_id"`
+	Email           string    `json:"email"`
+	Role            string    `json:"role"`
+	InvitedByUserID *string   `json:"invited_by_user_id"`
+	ExpiresAt       time.Time `json:"expires_at"`
+}
+
+// OrganizationInvitationAcceptedData is the payload for "organization.invitation.accepted".
+type OrganizationInvitationAcceptedData struct {
+	InvitationID     string    `json:"invitation_id"`
+	OrganizationID   string    `json:"organization_id"`
+	Email            string    `json:"email"`
+	Role             string    `json:"role"`
+	AcceptedByUserID string    `json:"accepted_by_user_id"`
+	AcceptedAt       time.Time `json:"accepted_at"`
+}
+
+// OrganizationInvitationRevokedData is the payload for "organization.invitation.revoked".
+type OrganizationInvitationRevokedData struct {
+	InvitationID    string    `json:"invitation_id"`
+	OrganizationID  string    `json:"organization_id"`
+	Email           string    `json:"email"`
+	Role            string    `json:"role"`
+	RevokedByUserID *string   `json:"revoked_by_user_id"`
+	RevokedAt       time.Time `json:"revoked_at"`
 }

@@ -126,6 +126,7 @@ Expected environment variables:
 - `AUTHARA_ISSUER` (default: `authara`)
 - `AUTHARA_JWT_KEYS` (required)
 - `AUTHARA_BASE_URL` (optional, enables refresh)
+- `AUTHARA_INTERNAL_API_TOKEN` (optional, enables internal API helpers)
 
 This helper is intentionally minimal and does not introduce implicit behavior.
 
@@ -201,6 +202,8 @@ Never blocks — attaches auth if available.
 ```go
 userID, ok := authara.UserIDFromContext(r.Context())
 roles, _ := authara.RolesFromContext(r.Context())
+organizationID, _ := authara.OrganizationIDFromContext(r.Context())
+organizationRole, _ := authara.OrganizationRoleFromContext(r.Context())
 ```
 
 ---
@@ -219,6 +222,19 @@ client := authara.NewClient("https://auth.example.com")
 
 ```go
 user, err := client.GetCurrentUser(ctx, r)
+```
+
+---
+
+### Internal API helpers
+
+```go
+client := authara.NewClient(
+	"https://auth.example.com",
+	authara.WithInternalAPIToken(os.Getenv("AUTHARA_INTERNAL_API_TOKEN")),
+)
+
+invite, err := client.CreateOrganizationInvitation(ctx, organizationID, actorUserID, "teammate@example.com")
 ```
 
 ---
@@ -294,7 +310,13 @@ data, _ := authara.DecodeWebhookData[authara.UserCreatedData](evt)
 ### Supported event payloads
 
 - `authara.UserCreatedData`
+- `authara.UserUpdatedData`
 - `authara.UserDeletedData`
+- `authara.OrganizationData`
+- `authara.OrganizationMembershipData`
+- `authara.OrganizationInvitationCreatedData`
+- `authara.OrganizationInvitationAcceptedData`
+- `authara.OrganizationInvitationRevokedData`
 
 ---
 

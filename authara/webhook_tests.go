@@ -74,6 +74,38 @@ func TestDecodeWebhookData(t *testing.T) {
 	}
 }
 
+func TestDecodeOrganizationInvitationWebhookData(t *testing.T) {
+	body := []byte(`{
+		"id":"evt_2",
+		"type":"organization.invitation.created",
+		"created_at":"2026-03-20T12:00:00Z",
+		"data":{
+			"invitation_id":"44444444-4444-4444-4444-444444444444",
+			"organization_id":"22222222-2222-2222-2222-222222222222",
+			"email":"teammate@example.com",
+			"role":"member",
+			"invited_by_user_id":"33333333-3333-3333-3333-333333333333",
+			"expires_at":"2026-03-27T12:00:00Z"
+		}
+	}`)
+
+	evt, err := ParseWebhookEvent(body)
+	if err != nil {
+		t.Fatalf("ParseWebhookEvent failed: %v", err)
+	}
+	if evt.Type != WebhookEventOrganizationInvitationCreated {
+		t.Fatalf("expected type %q, got %q", WebhookEventOrganizationInvitationCreated, evt.Type)
+	}
+
+	data, err := DecodeWebhookData[OrganizationInvitationCreatedData](evt)
+	if err != nil {
+		t.Fatalf("DecodeWebhookData failed: %v", err)
+	}
+	if data.Email != "teammate@example.com" || data.InvitedByUserID == nil || data.ExpiresAt.IsZero() {
+		t.Fatalf("unexpected invitation payload: %+v", data)
+	}
+}
+
 func TestWebhookHandler_Handle_Success(t *testing.T) {
 	secret := "super-secret"
 	body := []byte(`{
