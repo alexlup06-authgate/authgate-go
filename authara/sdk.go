@@ -13,8 +13,9 @@ import (
 type SDK struct {
 	verifier *verifier
 
-	autharaBaseURL string
-	httpClient     *http.Client
+	autharaBaseURL   string
+	internalAPIToken string
+	httpClient       *http.Client
 }
 
 // New initializes a new Authara SDK instance using the provided configuration.
@@ -55,8 +56,18 @@ func New(cfg Config) (*SDK, error) {
 	}
 
 	return &SDK{
-		verifier:       v,
-		autharaBaseURL: strings.TrimRight(cfg.AutharaBaseURL, "/"),
-		httpClient:     hc,
+		verifier:         v,
+		autharaBaseURL:   strings.TrimRight(cfg.AutharaBaseURL, "/"),
+		internalAPIToken: strings.TrimSpace(cfg.InternalAPIToken),
+		httpClient:       hc,
 	}, nil
+}
+
+// Client returns an Authara HTTP client using the SDK transport settings.
+func (s *SDK) Client() *Client {
+	return NewClient(
+		s.autharaBaseURL,
+		WithHTTPClient(s.httpClient),
+		WithInternalAPIToken(s.internalAPIToken),
+	)
 }

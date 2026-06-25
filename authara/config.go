@@ -31,6 +31,11 @@ type Config struct {
 	// If empty, RequireAuth will NOT attempt refresh and will behave as today.
 	AutharaBaseURL string
 
+	// InternalAPIToken authorizes calls to /auth/internal/v1.
+	//
+	// It must match AUTHARA_INTERNAL_API_TOKEN configured in Authara.
+	InternalAPIToken string
+
 	// HTTPClient is used for outbound calls to Authara (refresh).
 	// If nil, http.DefaultClient is used.
 	HTTPClient *http.Client

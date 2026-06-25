@@ -48,6 +48,7 @@ func TestConfigFromEnv_Defaults(t *testing.T) {
 func TestConfigFromEnv_BaseURL(t *testing.T) {
 	t.Setenv("AUTHARA_JWT_KEYS", "k1:YWJj")
 	t.Setenv("AUTHARA_BASE_URL", "http://example")
+	t.Setenv("AUTHARA_INTERNAL_API_TOKEN", " secret ")
 
 	cfg, err := ConfigFromEnv()
 	if err != nil {
@@ -56,6 +57,12 @@ func TestConfigFromEnv_BaseURL(t *testing.T) {
 
 	if cfg.AutharaBaseURL != "http://example" {
 		t.Fatalf("expected base url %q, got %q", "http://example", cfg.AutharaBaseURL)
+	}
+	if cfg.InternalAPIToken != "secret" {
+		t.Fatalf("expected internal api token %q, got %q", "secret", cfg.InternalAPIToken)
+	}
+	if InternalAPITokenFromEnv() != "secret" {
+		t.Fatalf("expected internal api token helper to trim")
 	}
 }
 

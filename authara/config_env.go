@@ -18,6 +18,7 @@ import (
 // Optional:
 //
 //	AUTHARA_BASE_URL
+//	AUTHARA_INTERNAL_API_TOKEN
 //
 // This helper is intentionally minimal and does not introduce implicit behavior.
 // It only maps environment variables to Config fields.
@@ -36,8 +37,16 @@ func ConfigFromEnv() (Config, error) {
 	if baseURL := strings.TrimSpace(os.Getenv("AUTHARA_BASE_URL")); baseURL != "" {
 		cfg.AutharaBaseURL = baseURL
 	}
+	if token := strings.TrimSpace(os.Getenv("AUTHARA_INTERNAL_API_TOKEN")); token != "" {
+		cfg.InternalAPIToken = token
+	}
 
 	return cfg, nil
+}
+
+// InternalAPITokenFromEnv returns AUTHARA_INTERNAL_API_TOKEN trimmed.
+func InternalAPITokenFromEnv() string {
+	return strings.TrimSpace(os.Getenv("AUTHARA_INTERNAL_API_TOKEN"))
 }
 
 // RequireWebhookHandlerFromEnv creates a WebhookHandler and fails if the

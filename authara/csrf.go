@@ -58,6 +58,10 @@ func LogoutFormDataFromRequest(
 //
 // The boolean return value is false if the cookie is missing or empty.
 func CSRFToken(req *http.Request) (string, bool) {
+	if req == nil {
+		return "", false
+	}
+
 	c, err := req.Cookie(CSRFCookieName)
 	if err != nil || c.Value == "" {
 		return "", false
