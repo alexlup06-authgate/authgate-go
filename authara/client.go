@@ -589,6 +589,16 @@ func (c *Client) GetOrganizationInvitation(ctx context.Context, organizationID u
 	return &out.Invitation, nil
 }
 
+func (c *Client) ResendOrganizationInvitation(ctx context.Context, organizationID uuid.UUID, invitationID uuid.UUID) (*Invitation, error) {
+	var out invitationResponse
+	path := internalOrganizationPath(organizationID) + "/invitations/" + url.PathEscape(invitationID.String()) + "/resend"
+	err := c.internalJSON(ctx, http.MethodPost, path, nil, &out)
+	if err != nil {
+		return nil, err
+	}
+	return &out.Invitation, nil
+}
+
 func (c *Client) RevokeOrganizationInvitation(ctx context.Context, organizationID uuid.UUID, invitationID uuid.UUID, revokedByUserID *uuid.UUID) (*Invitation, error) {
 	var body any
 	if revokedByUserID != nil {

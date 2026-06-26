@@ -445,3 +445,50 @@ func TestCreateOrganizationInvitation_SendsInternalBody(t *testing.T) {
 		t.Fatalf("unexpected invitation: %+v", invitation)
 	}
 }
+
+func TestResendOrganizationInvitation_SendsInternalRequest(t *testing.T) {
+	orgID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	oldInvitationID := uuid.MustParse("33333333-3333-3333-3333-333333333333")
+	newInvitationID := uuid.MustParse("44444444-4444-4444-4444-444444444444")
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Fatalf("unexpected method: %s", r.Method)
+		}
+		if r.URL.Path != "/auth/internal/v1/organizations/"+orgID.String()+"/invitations/"+oldInvitationID.String()+"/resend" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		if got := r.Header.Get("Authorization"); got != "Bearer token" {
+			t.Fatalf("unexpected authorization: %q", got)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		w.Write([]byte(`{
+			"invitation": {
+				"id": "` + newInvitationID.String() + `",
+				"organization_id": "` + orgID.String() + `",
+				"email": "teammate@example.com",
+				"role": "member",
+				"status": "pending",
+				"expires_at": "2026-01-08T12:00:00Z",
+				"invite_url": "https://example.com/auth/invitations/accept?token=fresh"
+			}
+		}`))
+	})
+
+	srv := httptest.NewServer(handler)
+	t.Cleanup(srv.Close)
+	client := NewClient(srv.URL, WithHTTPClient(srv.Client()), WithInternalAPIToken("token"))
+
+	invitation, err := client.ResendOrganizationInvitation(context.Background(), orgID, oldInvitationID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if invitation.ID != newInvitationID ||
+		invitation.OrganizationID != orgID ||
+		invitation.InviteURL != "https://example.com/auth/invitations/accept?token=fresh" ||
+		invitation.ExpiresAt.IsZero() {
+		t.Fatalf("unexpected invitation: %+v", invitation)
+	}
+}
