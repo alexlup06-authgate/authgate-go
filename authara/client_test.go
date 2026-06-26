@@ -229,6 +229,48 @@ func TestDoJSONRequest_OK(t *testing.T) {
 	}
 }
 
+func TestListCurrentOrganizationMembers_DecodesUserFields(t *testing.T) {
+	memberID := uuid.MustParse("33333333-3333-3333-3333-333333333333")
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/auth/api/v1/organizations/current/members" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		if _, err := r.Cookie(AccessCookieName); err != nil {
+			t.Fatal("expected access cookie")
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{
+			"members": [{
+				"user_id": "` + memberID.String() + `",
+				"email": "teammate@example.com",
+				"username": "teammate",
+				"role": "admin",
+				"created_at": "2026-01-08T12:00:00Z"
+			}]
+		}`))
+	})
+
+	client, _ := newTestClient(t, handler)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.AddCookie(&http.Cookie{Name: AccessCookieName, Value: "access-token"})
+
+	members, err := client.ListCurrentOrganizationMembers(context.Background(), req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(members) != 1 {
+		t.Fatalf("unexpected members: %+v", members)
+	}
+	if members[0].UserID != memberID ||
+		members[0].Email != "teammate@example.com" ||
+		members[0].Username != "teammate" ||
+		members[0].Role != "admin" ||
+		members[0].CreatedAt.IsZero() {
+		t.Fatalf("unexpected member: %+v", members[0])
+	}
+}
+
 func TestSwitchOrganization_ForwardsCookieAndCSRF(t *testing.T) {
 	orgID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -300,6 +342,55 @@ func TestGetCapabilities_SendsInternalToken(t *testing.T) {
 	}
 	if caps.OrganizationMode != "multi" || !caps.AllowsInvitations {
 		t.Fatalf("unexpected capabilities: %+v", caps)
+	}
+}
+
+func TestListOrganizationMembers_DecodesInternalMemberFields(t *testing.T) {
+	orgID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	memberID := uuid.MustParse("33333333-3333-3333-3333-333333333333")
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/auth/internal/v1/organizations/"+orgID.String()+"/members" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		if got := r.Header.Get("Authorization"); got != "Bearer token" {
+			t.Fatalf("unexpected authorization: %q", got)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{
+			"members": [{
+				"organization_id": "` + orgID.String() + `",
+				"user_id": "` + memberID.String() + `",
+				"email": "teammate@example.com",
+				"username": "teammate",
+				"role": "admin",
+				"created_at": "2026-01-08T12:00:00Z",
+				"updated_at": "2026-01-09T12:00:00Z",
+				"disabled": true
+			}]
+		}`))
+	})
+
+	srv := httptest.NewServer(handler)
+	t.Cleanup(srv.Close)
+	client := NewClient(srv.URL, WithHTTPClient(srv.Client()), WithInternalAPIToken("token"))
+
+	members, err := client.ListOrganizationMembers(context.Background(), orgID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(members) != 1 {
+		t.Fatalf("unexpected members: %+v", members)
+	}
+	if members[0].OrganizationID != orgID ||
+		members[0].UserID != memberID ||
+		members[0].Email != "teammate@example.com" ||
+		members[0].Username != "teammate" ||
+		members[0].Role != "admin" ||
+		members[0].CreatedAt.IsZero() ||
+		members[0].UpdatedAt.IsZero() ||
+		!members[0].Disabled {
+		t.Fatalf("unexpected member: %+v", members[0])
 	}
 }
 

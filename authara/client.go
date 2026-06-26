@@ -244,9 +244,20 @@ type Organization struct {
 type Membership struct {
 	OrganizationID uuid.UUID `json:"organization_id"`
 	UserID         uuid.UUID `json:"user_id"`
+	Email          string    `json:"email"`
+	Username       string    `json:"username"`
 	Role           string    `json:"role"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
+	Disabled       bool      `json:"disabled"`
+}
+
+type CurrentOrganizationMember struct {
+	UserID    uuid.UUID `json:"user_id"`
+	Email     string    `json:"email"`
+	Username  string    `json:"username"`
+	Role      string    `json:"role"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 type MembershipWithOrganization struct {
@@ -395,6 +406,26 @@ func (c *Client) GetCurrentOrganization(ctx context.Context, incoming *http.Requ
 		return nil, err
 	}
 	return &out, nil
+}
+
+type currentMembersResponse struct {
+	Members []CurrentOrganizationMember `json:"members"`
+}
+
+func (c *Client) ListCurrentOrganizationMembers(ctx context.Context, incoming *http.Request) ([]CurrentOrganizationMember, error) {
+	var out currentMembersResponse
+	resp, err := c.doJSONBody(
+		ctx,
+		http.MethodGet,
+		"/auth/api/v1/organizations/current/members",
+		nil,
+		&out,
+		withIncomingRequest(incoming),
+	)
+	if resp != nil && resp.StatusCode == http.StatusUnauthorized {
+		return nil, nil
+	}
+	return out.Members, err
 }
 
 func (c *Client) SwitchOrganization(ctx context.Context, incoming *http.Request, organizationID uuid.UUID, audience string) (*Tokens, error) {
