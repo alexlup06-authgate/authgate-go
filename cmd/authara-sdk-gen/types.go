@@ -54,6 +54,13 @@ func (g generator) typesFile() []byte {
 		}
 		b.WriteString(fmt.Sprintf("type %s %s\n\n", typeName, g.goType(g.schemas[name])))
 	}
+	for _, constant := range g.enumConstants() {
+		b.WriteString("const " + constant.name)
+		if constant.typeName != "" {
+			b.WriteString(" " + constant.typeName)
+		}
+		b.WriteString(" = " + constant.literal + "\n\n")
+	}
 	return b.Bytes()
 }
 
@@ -88,12 +95,21 @@ func (g generator) goType(ref *openapi3.SchemaRef) string {
 	case "boolean":
 		return "bool"
 	case "integer":
+		switch schema.Format {
+		case "int32":
+			return "int32"
+		case "int64":
+			return "int64"
+		}
 		return "int"
 	case "number":
 		return "float64"
 	case "array":
 		return "[]" + g.goType(schema.Items)
 	case "object":
+		if schema.AdditionalProperties.Schema != nil {
+			return "map[string]" + g.goType(schema.AdditionalProperties.Schema)
+		}
 		if schema.AdditionalProperties.Has != nil && *schema.AdditionalProperties.Has {
 			return "map[string]any"
 		}
@@ -104,8 +120,5 @@ func (g generator) goType(ref *openapi3.SchemaRef) string {
 }
 
 func optionalType(t string) string {
-	if strings.HasPrefix(t, "[]") || strings.HasPrefix(t, "map[") {
-		return t
-	}
 	return "*" + t
 }

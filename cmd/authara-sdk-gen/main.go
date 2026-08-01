@@ -34,6 +34,9 @@ func main() {
 		doc:     doc,
 		schemas: doc.Components.Schemas,
 	}
+	if err := g.validateSupport(); err != nil {
+		log.Fatal(err)
+	}
 
 	clientSrc, err := g.clientFile()
 	if err != nil {

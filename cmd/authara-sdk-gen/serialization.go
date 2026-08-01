@@ -203,7 +203,7 @@ func scalarTypeStringExpr(goType, format, value string, schemaTypes ...string) (
 			schemaType = "string"
 		case "bool":
 			schemaType = "boolean"
-		case "int":
+		case "int", "int32", "int64":
 			schemaType = "integer"
 		case "float64":
 			schemaType = "number"

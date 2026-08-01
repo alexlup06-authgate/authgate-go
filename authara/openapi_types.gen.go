@@ -229,3 +229,69 @@ type APIUpdateOrganizationRequest struct {
 type APIUserMemberships struct {
 	Memberships []APIMembershipWithOrganization `json:"memberships"`
 }
+
+const APIAppAudienceApp = "app"
+
+const APIAudienceAdmin = "admin"
+
+const APIAudienceApp = "app"
+
+const APICapabilitiesOrganizationModeMulti = "multi"
+
+const APICapabilitiesOrganizationModePersonal = "personal"
+
+const APICapabilitiesOrganizationModeSingle = "single"
+
+const APICurrentUserRolesItemAutharaAdmin = "authara:admin"
+
+const APICurrentUserRolesItemAutharaAuditor = "authara:auditor"
+
+const APICurrentUserRolesItemAutharaMonitor = "authara:monitor"
+
+const APIFinishPasskeyAuthenticationAudienceAdmin = "admin"
+
+const APIFinishPasskeyAuthenticationAudienceApp = "app"
+
+const APILoginWithGoogleAudienceAdmin = "admin"
+
+const APILoginWithGoogleAudienceApp = "app"
+
+const APILoginWithPasswordAudienceAdmin = "admin"
+
+const APILoginWithPasswordAudienceApp = "app"
+
+const APIOrganizationInvitationStatusAccepted = "accepted"
+
+const APIOrganizationInvitationStatusExpired = "expired"
+
+const APIOrganizationInvitationStatusPending = "pending"
+
+const APIOrganizationInvitationStatusRevoked = "revoked"
+
+const APIOrganizationKindPersonal = "personal"
+
+const APIOrganizationKindTeam = "team"
+
+const APIOrganizationRoleAdmin APIOrganizationRole = "admin"
+
+const APIOrganizationRoleMember APIOrganizationRole = "member"
+
+const APIOrganizationRoleOwner APIOrganizationRole = "owner"
+
+const APIRefreshSessionAudienceAdmin = "admin"
+
+const APIRefreshSessionAudienceApp = "app"
+
+const APISignupDirectAudienceApp = "app"
+
+const APIStartSignupChallengeAudienceApp = "app"
+
+const APISwitchOrganizationAudienceAdmin = "admin"
+
+const APISwitchOrganizationAudienceApp = "app"
+
+const APITokenRefreshRequestAudienceAdmin = "admin"
+
+const APITokenRefreshRequestAudienceApp = "app"
+
+const APIVerifySignupChallengeAudienceApp = "app"
