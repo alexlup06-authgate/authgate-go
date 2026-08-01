@@ -64,7 +64,9 @@ func (c *Client) CallGetCSRFToken(ctx context.Context) (*APICSRFToken, error) {
 func (c *Client) CallLoginWithPassword(ctx context.Context, incoming *http.Request, audience string, body APIPasswordLoginRequest) (*APIAuthSession, error) {
 	var out APIAuthSession
 	path := "/auth/api/v1/login"
-	path += "?audience=" + url.QueryEscape(audienceOrApp(audience))
+	query := url.Values{}
+	query.Set("audience", audienceOrApp(audience))
+	path += "?" + query.Encode()
 	_, err := c.doJSONBody(ctx, http.MethodPost, path, body, &out, apiRequestOptions(incoming, []string{"authara_csrf"}, true)...)
 	if err != nil {
 		return nil, err
@@ -75,7 +77,9 @@ func (c *Client) CallLoginWithPassword(ctx context.Context, incoming *http.Reque
 func (c *Client) CallLoginWithGoogle(ctx context.Context, incoming *http.Request, audience string, body APIGoogleLoginRequest) (*APIAuthSession, error) {
 	var out APIAuthSession
 	path := "/auth/api/v1/oauth/google"
-	path += "?audience=" + url.QueryEscape(audienceOrApp(audience))
+	query := url.Values{}
+	query.Set("audience", audienceOrApp(audience))
+	path += "?" + query.Encode()
 	_, err := c.doJSONBody(ctx, http.MethodPost, path, body, &out, apiRequestOptions(incoming, []string{"authara_csrf", "authara_oauth_nonce"}, true)...)
 	if err != nil {
 		return nil, err
@@ -196,7 +200,9 @@ func (c *Client) CallGetPublicOrganizationMember(ctx context.Context, incoming *
 func (c *Client) CallSwitchOrganization(ctx context.Context, incoming *http.Request, organizationID uuid.UUID, audience string) (*APITokens, error) {
 	var out APITokens
 	path := "/auth/api/v1/organizations/" + url.PathEscape(organizationID.String()) + "/switch"
-	path += "?audience=" + url.QueryEscape(audienceOrApp(audience))
+	query := url.Values{}
+	query.Set("audience", audienceOrApp(audience))
+	path += "?" + query.Encode()
 	_, err := c.doJSONBody(ctx, http.MethodPost, path, nil, &out, apiRequestOptions(incoming, []string{"authara_access", "authara_csrf"}, true)...)
 	if err != nil {
 		return nil, err
@@ -207,7 +213,9 @@ func (c *Client) CallSwitchOrganization(ctx context.Context, incoming *http.Requ
 func (c *Client) CallFinishPasskeyAuthentication(ctx context.Context, incoming *http.Request, audience string, body APIPasskeyAuthenticationFinishRequest) (*APIAuthSession, error) {
 	var out APIAuthSession
 	path := "/auth/api/v1/passkeys/authenticate/finish"
-	path += "?audience=" + url.QueryEscape(audienceOrApp(audience))
+	query := url.Values{}
+	query.Set("audience", audienceOrApp(audience))
+	path += "?" + query.Encode()
 	_, err := c.doJSONBody(ctx, http.MethodPost, path, body, &out, apiRequestOptions(incoming, []string{"authara_csrf"}, true)...)
 	if err != nil {
 		return nil, err
@@ -255,7 +263,9 @@ func (c *Client) CallLogout(ctx context.Context, incoming *http.Request) error {
 
 func (c *Client) CallRefreshSession(ctx context.Context, incoming *http.Request, audience string) error {
 	path := "/auth/api/v1/sessions/refresh"
-	path += "?audience=" + url.QueryEscape(audienceOrApp(audience))
+	query := url.Values{}
+	query.Set("audience", audienceOrApp(audience))
+	path += "?" + query.Encode()
 	_, err := c.doJSONBody(ctx, http.MethodPost, path, nil, nil, apiRequestOptions(incoming, []string{"authara_csrf", "authara_refresh"}, true)...)
 	if err != nil {
 		return err
@@ -266,7 +276,9 @@ func (c *Client) CallRefreshSession(ctx context.Context, incoming *http.Request,
 func (c *Client) CallStartSignupChallenge(ctx context.Context, incoming *http.Request, audience string, body APISignupRequest) (*APISignupChallenge, error) {
 	var out APISignupChallenge
 	path := "/auth/api/v1/signup/challenges"
-	path += "?audience=" + url.QueryEscape(audienceOrApp(audience))
+	query := url.Values{}
+	query.Set("audience", audienceOrApp(audience))
+	path += "?" + query.Encode()
 	_, err := c.doJSONBody(ctx, http.MethodPost, path, body, &out, apiRequestOptions(incoming, []string{"authara_csrf"}, true)...)
 	if err != nil {
 		return nil, err
@@ -277,7 +289,9 @@ func (c *Client) CallStartSignupChallenge(ctx context.Context, incoming *http.Re
 func (c *Client) CallVerifySignupChallenge(ctx context.Context, incoming *http.Request, audience string, body APISignupChallengeVerification) (*APIAuthSession, error) {
 	var out APIAuthSession
 	path := "/auth/api/v1/signup/challenges/verify"
-	path += "?audience=" + url.QueryEscape(audienceOrApp(audience))
+	query := url.Values{}
+	query.Set("audience", audienceOrApp(audience))
+	path += "?" + query.Encode()
 	_, err := c.doJSONBody(ctx, http.MethodPost, path, body, &out, apiRequestOptions(incoming, []string{"authara_csrf"}, true)...)
 	if err != nil {
 		return nil, err
@@ -288,7 +302,9 @@ func (c *Client) CallVerifySignupChallenge(ctx context.Context, incoming *http.R
 func (c *Client) CallSignupDirect(ctx context.Context, incoming *http.Request, audience string, body APISignupRequest) (*APIAuthSession, error) {
 	var out APIAuthSession
 	path := "/auth/api/v1/signup/direct"
-	path += "?audience=" + url.QueryEscape(audienceOrApp(audience))
+	query := url.Values{}
+	query.Set("audience", audienceOrApp(audience))
+	path += "?" + query.Encode()
 	_, err := c.doJSONBody(ctx, http.MethodPost, path, body, &out, apiRequestOptions(incoming, []string{"authara_csrf"}, true)...)
 	if err != nil {
 		return nil, err
