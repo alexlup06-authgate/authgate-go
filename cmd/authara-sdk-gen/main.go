@@ -23,13 +23,23 @@ type generator struct {
 	schemas map[string]*openapi3.SchemaRef
 }
 
+type authMode string
+
+const (
+	authPublic         authMode = ""
+	authCookie         authMode = "cookie"
+	authInternalBearer authMode = "internal_bearer"
+)
+
+const authModeExtension = "x-authara-auth-mode"
+
 type operation struct {
 	Method       string
 	Path         string
 	OperationID  string
 	RequestType  string
 	ResponseType string
-	Internal     bool
+	Auth         authMode
 	NeedsRequest bool
 	NeedsCSRF    bool
 	Cookies      []string
@@ -64,10 +74,14 @@ func main() {
 		schemas: doc.Components.Schemas,
 	}
 
+	clientSrc, err := g.clientFile()
+	if err != nil {
+		log.Fatal(err)
+	}
 	if err := writeGenerated(filepath.Join(*outDir, "openapi_types.gen.go"), g.typesFile()); err != nil {
 		log.Fatal(err)
 	}
-	if err := writeGenerated(filepath.Join(*outDir, "openapi_client.gen.go"), g.clientFile()); err != nil {
+	if err := writeGenerated(filepath.Join(*outDir, "openapi_client.gen.go"), clientSrc); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -131,7 +145,7 @@ func (g generator) typesFile() []byte {
 	return b.Bytes()
 }
 
-func (g generator) clientFile() []byte {
+func (g generator) clientFile() ([]byte, error) {
 	var b bytes.Buffer
 	b.WriteString(g.header())
 	b.WriteString("import (\n")
@@ -164,11 +178,15 @@ func (g generator) clientFile() []byte {
 
 `)
 
-	for _, op := range g.operations() {
+	ops, err := g.operations()
+	if err != nil {
+		return nil, err
+	}
+	for _, op := range ops {
 		b.WriteString(g.method(op))
 		b.WriteByte('\n')
 	}
-	return b.Bytes()
+	return b.Bytes(), nil
 }
 
 func (g generator) method(op operation) string {
@@ -216,11 +234,12 @@ func (g generator) method(op operation) string {
 	if op.ResponseType != "" {
 		out = "&out"
 	}
-	if op.Internal {
+	switch op.Auth {
+	case authInternalBearer:
 		b.WriteString(fmt.Sprintf("\terr := c.internalJSON(ctx, %s, path, %s, %s)\n", methodConst(op.Method), body, out))
-	} else if op.NeedsRequest {
+	case authCookie:
 		b.WriteString(fmt.Sprintf("\t_, err := c.doJSONBody(ctx, %s, path, %s, %s, apiRequestOptions(incoming, %#v, %t)...)\n", methodConst(op.Method), body, out, op.Cookies, op.NeedsCSRF))
-	} else {
+	case authPublic:
 		b.WriteString(fmt.Sprintf("\t_, err := c.doJSONBody(ctx, %s, path, %s, %s)\n", methodConst(op.Method), body, out))
 	}
 	b.WriteString("\tif err != nil {\n")
@@ -239,7 +258,7 @@ func (g generator) method(op operation) string {
 	return b.String()
 }
 
-func (g generator) operations() []operation {
+func (g generator) operations() ([]operation, error) {
 	var ops []operation
 	paths := g.doc.Paths.Map()
 	pathNames := make([]string, 0, len(paths))
@@ -258,17 +277,20 @@ func (g generator) operations() []operation {
 				Method:      method,
 				Path:        path,
 				OperationID: op.OperationID,
-				Internal:    strings.HasPrefix(path, "/auth/internal/"),
 			}
 			operation.PathParams, operation.QueryParams = g.parameters(pathItem.Parameters, op.Parameters)
 			operation.RequestType = g.requestType(op)
 			operation.ResponseType = g.responseType(op)
-			operation.Cookies, operation.NeedsCSRF = g.security(op)
-			operation.NeedsRequest = !operation.Internal && (len(operation.Cookies) > 0 || operation.NeedsCSRF)
+			var err error
+			operation.Auth, operation.Cookies, operation.NeedsCSRF, err = g.security(op)
+			if err != nil {
+				return nil, fmt.Errorf("operation %s %s (%s): %w", method, path, op.OperationID, err)
+			}
+			operation.NeedsRequest = operation.Auth == authCookie
 			ops = append(ops, operation)
 		}
 	}
-	return ops
+	return ops, nil
 }
 
 func (g generator) parameters(groups ...openapi3.Parameters) ([]parameter, []parameter) {
@@ -321,29 +343,101 @@ func (g generator) responseType(op *openapi3.Operation) string {
 	return ""
 }
 
-func (g generator) security(op *openapi3.Operation) ([]string, bool) {
+func (g generator) security(op *openapi3.Operation) (authMode, []string, bool, error) {
+	requirements := g.doc.Security
+	if op.Security != nil {
+		requirements = *op.Security
+	}
+	if len(requirements) == 0 {
+		return authPublic, nil, false, nil
+	}
+	if len(requirements) != 1 {
+		return "", nil, false, fmt.Errorf("multiple alternative security requirements are unsupported")
+	}
+
+	requirement := requirements[0]
+	if len(requirement) == 0 {
+		return authPublic, nil, false, nil
+	}
+
+	names := make([]string, 0, len(requirement))
+	for name := range requirement {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	mode := authPublic
 	var cookies []string
 	seen := map[string]bool{}
 	needsCSRF := false
-	if op.Security == nil {
-		return cookies, needsCSRF
-	}
-	for _, requirement := range *op.Security {
-		for name := range requirement {
-			switch name {
-			case "csrfHeader":
-				needsCSRF = true
-			case "accessCookie", "refreshCookie", "csrfCookie", "oauthNonceCookie":
-				scheme := g.doc.Components.SecuritySchemes[name]
-				if scheme != nil && scheme.Value != nil && scheme.Value.Name != "" && !seen[scheme.Value.Name] {
-					cookies = append(cookies, scheme.Value.Name)
-					seen[scheme.Value.Name] = true
-				}
+	for _, name := range names {
+		schemeRef := g.doc.Components.SecuritySchemes[name]
+		if schemeRef == nil || schemeRef.Value == nil {
+			return "", nil, false, fmt.Errorf("security scheme %q is missing or unresolved", name)
+		}
+		scheme := schemeRef.Value
+		if len(requirement[name]) > 0 {
+			return "", nil, false, fmt.Errorf("security scheme %q has unsupported scopes", name)
+		}
+		modeName, err := securityMode(scheme)
+		if err != nil {
+			return "", nil, false, fmt.Errorf("security scheme %q: %w", name, err)
+		}
+		if modeName != authPublic && modeName != authInternalBearer {
+			return "", nil, false, fmt.Errorf("security scheme %q has unsupported auth mode %q", name, modeName)
+		}
+
+		switch {
+		case modeName == authInternalBearer:
+			if scheme.Type != "http" || !strings.EqualFold(scheme.Scheme, "bearer") {
+				return "", nil, false, fmt.Errorf("must be an HTTP bearer scheme")
 			}
+			if mode != authPublic {
+				return "", nil, false, fmt.Errorf("security scheme %q cannot be combined with other authentication", name)
+			}
+			mode = authInternalBearer
+		case scheme.Type == "apiKey" && scheme.In == "header":
+			if !strings.EqualFold(scheme.Name, "X-CSRF-Token") {
+				return "", nil, false, fmt.Errorf("must be the X-CSRF-Token header")
+			}
+			if mode == authInternalBearer {
+				return "", nil, false, fmt.Errorf("security scheme %q cannot be combined with internal bearer authentication", name)
+			}
+			mode = authCookie
+			needsCSRF = true
+		case scheme.Type == "apiKey" && scheme.In == "cookie":
+			if scheme.Name == "" {
+				return "", nil, false, fmt.Errorf("cookie security scheme %q has no cookie name", name)
+			}
+			if mode == authInternalBearer {
+				return "", nil, false, fmt.Errorf("cookie security scheme %q cannot be combined with internal bearer authentication", name)
+			}
+			mode = authCookie
+			if !seen[scheme.Name] {
+				cookies = append(cookies, scheme.Name)
+				seen[scheme.Name] = true
+			}
+		default:
+			return "", nil, false, fmt.Errorf("security scheme %q is unsupported", name)
 		}
 	}
 	sort.Strings(cookies)
-	return cookies, needsCSRF
+	return mode, cookies, needsCSRF, nil
+}
+
+func securityMode(scheme *openapi3.SecurityScheme) (authMode, error) {
+	if scheme.Extensions == nil {
+		return authPublic, nil
+	}
+	value, ok := scheme.Extensions[authModeExtension]
+	if !ok {
+		return authPublic, nil
+	}
+	mode, ok := value.(string)
+	if !ok || strings.TrimSpace(mode) == "" {
+		return authPublic, fmt.Errorf("%s must be a non-empty string", authModeExtension)
+	}
+	return authMode(strings.TrimSpace(mode)), nil
 }
 
 func (g generator) goType(ref *openapi3.SchemaRef) string {
