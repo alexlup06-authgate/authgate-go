@@ -42,11 +42,10 @@ sessions, refresh logic, CSRF enforcement, and security invariants.
 
 ### Backend client helpers (optional)
 
-- Provides **explicit, side-effect-free HTTP helpers** for calling Authara
+- Provides **generated, side-effect-free HTTP helpers** for calling Authara
   endpoints from backend or SSR applications
 - Forwards existing authentication context (access cookie) only
-- Exposes identity data via dedicated helpers (e.g. `GetCurrentUser`)
-- Offers a generic escape-hatch helper for user-defined Authara endpoints
+- Exposes API calls generated from the Authara OpenAPI contract
 
 These helpers are **strict by design**:
 - no token refresh
@@ -221,7 +220,7 @@ client := authara.NewClient("https://auth.example.com")
 ### Fetching current user
 
 ```go
-user, err := client.GetCurrentUser(ctx, r)
+user, err := client.CallGetCurrentUser(ctx, r)
 ```
 
 ---
@@ -234,15 +233,14 @@ client := authara.NewClient(
 	authara.WithInternalAPIToken(os.Getenv("AUTHARA_INTERNAL_API_TOKEN")),
 )
 
-invite, err := client.CreateOrganizationInvitation(ctx, organizationID, actorUserID, "teammate@example.com")
-```
-
----
-
-### Generic request helper
-
-```go
-resp, err := authara.DoJSONRequest(...)
+invite, err := client.CallCreateInternalOrganizationInvitation(
+	ctx,
+	organizationID,
+	authara.APIInternalCreateInvitationRequest{
+		ActorUserID: actorUserID,
+		Email:       "teammate@example.com",
+	},
+)
 ```
 
 ---

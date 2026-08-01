@@ -29,6 +29,13 @@ jobs:
       - name: Run go vet
         run: go vet ./...
 
+      - name: Vet SDK generator
+        working-directory: cmd/authara-sdk-gen
+        run: go vet ./...
+
       - name: Run tests
         run: go test ./...
 
+      - name: Test SDK generator
+        working-directory: cmd/authara-sdk-gen
+        run: go test ./...
