@@ -82,8 +82,10 @@ type APIGoogleLoginRequest struct {
 }
 
 type APIInternalCreateInvitationRequest struct {
-	ActorUserID uuid.UUID `json:"actor_user_id"`
-	Email       string    `json:"email"`
+	ActorUserID uuid.UUID                      `json:"actor_user_id"`
+	Email       string                         `json:"email"`
+	Metadata    *map[string]any                `json:"metadata,omitempty"`
+	Role        *APIOrganizationInvitationRole `json:"role,omitempty"`
 }
 
 type APIInternalCreateOrganizationRequest struct {
@@ -122,6 +124,7 @@ type APIOrganizationInvitation struct {
 	ExpiresAt      time.Time           `json:"expires_at"`
 	ID             uuid.UUID           `json:"id"`
 	InviteURL      *string             `json:"invite_url,omitempty"`
+	Metadata       map[string]any      `json:"metadata"`
 	OrganizationID uuid.UUID           `json:"organization_id"`
 	Role           APIOrganizationRole `json:"role"`
 	Status         string              `json:"status"`
@@ -130,6 +133,8 @@ type APIOrganizationInvitation struct {
 type APIOrganizationInvitationEnvelope struct {
 	Invitation APIOrganizationInvitation `json:"invitation"`
 }
+
+type APIOrganizationInvitationRole string
 
 type APIOrganizationInvitations struct {
 	Invitations []APIOrganizationInvitation `json:"invitations"`
@@ -229,3 +234,73 @@ type APIUpdateOrganizationRequest struct {
 type APIUserMemberships struct {
 	Memberships []APIMembershipWithOrganization `json:"memberships"`
 }
+
+const APIAppAudienceApp = "app"
+
+const APIAudienceAdmin = "admin"
+
+const APIAudienceApp = "app"
+
+const APICapabilitiesOrganizationModeMulti = "multi"
+
+const APICapabilitiesOrganizationModePersonal = "personal"
+
+const APICapabilitiesOrganizationModeSingle = "single"
+
+const APICurrentUserRolesItemAutharaAdmin = "authara:admin"
+
+const APICurrentUserRolesItemAutharaAuditor = "authara:auditor"
+
+const APICurrentUserRolesItemAutharaMonitor = "authara:monitor"
+
+const APIFinishPasskeyAuthenticationAudienceAdmin = "admin"
+
+const APIFinishPasskeyAuthenticationAudienceApp = "app"
+
+const APILoginWithGoogleAudienceAdmin = "admin"
+
+const APILoginWithGoogleAudienceApp = "app"
+
+const APILoginWithPasswordAudienceAdmin = "admin"
+
+const APILoginWithPasswordAudienceApp = "app"
+
+const APIOrganizationInvitationRoleAdmin APIOrganizationInvitationRole = "admin"
+
+const APIOrganizationInvitationRoleMember APIOrganizationInvitationRole = "member"
+
+const APIOrganizationInvitationStatusAccepted = "accepted"
+
+const APIOrganizationInvitationStatusExpired = "expired"
+
+const APIOrganizationInvitationStatusPending = "pending"
+
+const APIOrganizationInvitationStatusRevoked = "revoked"
+
+const APIOrganizationKindPersonal = "personal"
+
+const APIOrganizationKindTeam = "team"
+
+const APIOrganizationRoleAdmin APIOrganizationRole = "admin"
+
+const APIOrganizationRoleMember APIOrganizationRole = "member"
+
+const APIOrganizationRoleOwner APIOrganizationRole = "owner"
+
+const APIRefreshSessionAudienceAdmin = "admin"
+
+const APIRefreshSessionAudienceApp = "app"
+
+const APISignupDirectAudienceApp = "app"
+
+const APIStartSignupChallengeAudienceApp = "app"
+
+const APISwitchOrganizationAudienceAdmin = "admin"
+
+const APISwitchOrganizationAudienceApp = "app"
+
+const APITokenRefreshRequestAudienceAdmin = "admin"
+
+const APITokenRefreshRequestAudienceApp = "app"
+
+const APIVerifySignupChallengeAudienceApp = "app"

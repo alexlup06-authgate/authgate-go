@@ -232,6 +232,8 @@ client := authara.NewClient(
 	"https://auth.example.com",
 	authara.WithInternalAPIToken(os.Getenv("AUTHARA_INTERNAL_API_TOKEN")),
 )
+role := authara.APIOrganizationInvitationRoleAdmin
+metadata := map[string]any{"baufunk": map[string]any{"role": "manager"}}
 
 invite, err := client.CallCreateInternalOrganizationInvitation(
 	ctx,
@@ -239,6 +241,8 @@ invite, err := client.CallCreateInternalOrganizationInvitation(
 	authara.APIInternalCreateInvitationRequest{
 		ActorUserID: actorUserID,
 		Email:       "teammate@example.com",
+		Role:        &role,
+		Metadata:    &metadata,
 	},
 )
 ```
@@ -311,6 +315,7 @@ data, _ := authara.DecodeWebhookData[authara.UserCreatedData](evt)
 - `authara.UserUpdatedData`
 - `authara.UserDeletedData`
 - `authara.OrganizationData`
+- `authara.OrganizationMembershipCreatedData`
 - `authara.OrganizationMembershipData`
 - `authara.OrganizationInvitationCreatedData`
 - `authara.OrganizationInvitationAcceptedData`

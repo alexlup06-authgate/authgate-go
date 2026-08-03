@@ -2,6 +2,7 @@ package authara
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -73,6 +74,13 @@ func TestGeneratedInternalCallSendsBearerToken(t *testing.T) {
 		if got := r.Header.Get("Authorization"); got != "Bearer token" {
 			t.Fatalf("unexpected authorization: %q", got)
 		}
+		var body APIInternalCreateInvitationRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("decode request body: %v", err)
+		}
+		if body.Role == nil || *body.Role != APIOrganizationInvitationRoleAdmin || body.Metadata == nil {
+			t.Fatalf("unexpected request body: %+v", body)
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
@@ -81,7 +89,8 @@ func TestGeneratedInternalCallSendsBearerToken(t *testing.T) {
 				"id": "` + invitationID.String() + `",
 				"organization_id": "` + orgID.String() + `",
 				"email": "teammate@example.com",
-				"role": "member",
+				"role": "admin",
+				"metadata": {"baufunk":{"role":"manager"}},
 				"status": "pending",
 				"expires_at": "2026-01-08T12:00:00Z"
 			}
@@ -89,17 +98,27 @@ func TestGeneratedInternalCallSendsBearerToken(t *testing.T) {
 	})
 
 	client, _ := newTestClient(t, handler, WithInternalAPIToken(" token "))
+	role := APIOrganizationInvitationRoleAdmin
+	metadata := map[string]any{"baufunk": map[string]any{"role": "manager"}}
 
 	invitation, err := client.CallCreateInternalOrganizationInvitation(
 		context.Background(),
 		orgID,
-		APIInternalCreateInvitationRequest{ActorUserID: actorID, Email: "teammate@example.com"},
+		APIInternalCreateInvitationRequest{
+			ActorUserID: actorID,
+			Email:       "teammate@example.com",
+			Role:        &role,
+			Metadata:    &metadata,
+		},
 	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if invitation.Invitation.ID != invitationID {
 		t.Fatalf("unexpected invitation: %+v", invitation)
+	}
+	if invitation.Invitation.Role != APIOrganizationRoleAdmin || invitation.Invitation.Metadata == nil {
+		t.Fatalf("unexpected invitation role or metadata: %+v", invitation.Invitation)
 	}
 }
 
