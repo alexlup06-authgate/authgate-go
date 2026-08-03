@@ -67,32 +67,45 @@ type OrganizationMembershipData struct {
 	Role           string `json:"role"`
 }
 
+// OrganizationMembershipCreatedData is the payload for "organization.membership.created".
+type OrganizationMembershipCreatedData struct {
+	OrganizationID      string          `json:"organization_id"`
+	UserID              string          `json:"user_id"`
+	Role                string          `json:"role"`
+	IsInitialMembership bool            `json:"is_initial_membership"`
+	InvitationID        *string         `json:"invitation_id"`
+	Metadata            json.RawMessage `json:"metadata"`
+}
+
 // OrganizationInvitationCreatedData is the payload for "organization.invitation.created".
 type OrganizationInvitationCreatedData struct {
-	InvitationID    string    `json:"invitation_id"`
-	OrganizationID  string    `json:"organization_id"`
-	Email           string    `json:"email"`
-	Role            string    `json:"role"`
-	InvitedByUserID *string   `json:"invited_by_user_id"`
-	ExpiresAt       time.Time `json:"expires_at"`
+	InvitationID    string          `json:"invitation_id"`
+	OrganizationID  string          `json:"organization_id"`
+	Email           string          `json:"email"`
+	Role            string          `json:"role"`
+	Metadata        json.RawMessage `json:"metadata"`
+	InvitedByUserID *string         `json:"invited_by_user_id"`
+	ExpiresAt       time.Time       `json:"expires_at"`
 }
 
 // OrganizationInvitationAcceptedData is the payload for "organization.invitation.accepted".
 type OrganizationInvitationAcceptedData struct {
-	InvitationID     string    `json:"invitation_id"`
-	OrganizationID   string    `json:"organization_id"`
-	Email            string    `json:"email"`
-	Role             string    `json:"role"`
-	AcceptedByUserID string    `json:"accepted_by_user_id"`
-	AcceptedAt       time.Time `json:"accepted_at"`
+	InvitationID     string          `json:"invitation_id"`
+	OrganizationID   string          `json:"organization_id"`
+	Email            string          `json:"email"`
+	Role             string          `json:"role"`
+	Metadata         json.RawMessage `json:"metadata"`
+	AcceptedByUserID string          `json:"accepted_by_user_id"`
+	AcceptedAt       time.Time       `json:"accepted_at"`
 }
 
 // OrganizationInvitationRevokedData is the payload for "organization.invitation.revoked".
 type OrganizationInvitationRevokedData struct {
-	InvitationID    string    `json:"invitation_id"`
-	OrganizationID  string    `json:"organization_id"`
-	Email           string    `json:"email"`
-	Role            string    `json:"role"`
-	RevokedByUserID *string   `json:"revoked_by_user_id"`
-	RevokedAt       time.Time `json:"revoked_at"`
+	InvitationID    string          `json:"invitation_id"`
+	OrganizationID  string          `json:"organization_id"`
+	Email           string          `json:"email"`
+	Role            string          `json:"role"`
+	Metadata        json.RawMessage `json:"metadata"`
+	RevokedByUserID *string         `json:"revoked_by_user_id"`
+	RevokedAt       time.Time       `json:"revoked_at"`
 }

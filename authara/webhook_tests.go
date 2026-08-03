@@ -74,6 +74,34 @@ func TestDecodeWebhookData(t *testing.T) {
 	}
 }
 
+func TestDecodeOrganizationMembershipCreatedWebhookData(t *testing.T) {
+	body := []byte(`{
+		"id":"evt_membership",
+		"type":"organization.membership.created",
+		"created_at":"2026-03-20T12:00:00Z",
+		"data":{
+			"organization_id":"22222222-2222-2222-2222-222222222222",
+			"user_id":"33333333-3333-3333-3333-333333333333",
+			"role":"admin",
+			"is_initial_membership":false,
+			"invitation_id":"44444444-4444-4444-4444-444444444444",
+			"metadata":{"baufunk":{"role":"manager"}}
+		}
+	}`)
+
+	evt, err := ParseWebhookEvent(body)
+	if err != nil {
+		t.Fatalf("ParseWebhookEvent failed: %v", err)
+	}
+	data, err := DecodeWebhookData[OrganizationMembershipCreatedData](evt)
+	if err != nil {
+		t.Fatalf("DecodeWebhookData failed: %v", err)
+	}
+	if data.IsInitialMembership || data.InvitationID == nil || data.Role != "admin" || len(data.Metadata) == 0 {
+		t.Fatalf("unexpected membership payload: %+v", data)
+	}
+}
+
 func TestDecodeOrganizationInvitationWebhookData(t *testing.T) {
 	body := []byte(`{
 		"id":"evt_2",
@@ -84,6 +112,7 @@ func TestDecodeOrganizationInvitationWebhookData(t *testing.T) {
 			"organization_id":"22222222-2222-2222-2222-222222222222",
 			"email":"teammate@example.com",
 			"role":"member",
+			"metadata":{"baufunk":{"role":"worker"}},
 			"invited_by_user_id":"33333333-3333-3333-3333-333333333333",
 			"expires_at":"2026-03-27T12:00:00Z"
 		}
@@ -101,7 +130,7 @@ func TestDecodeOrganizationInvitationWebhookData(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DecodeWebhookData failed: %v", err)
 	}
-	if data.Email != "teammate@example.com" || data.InvitedByUserID == nil || data.ExpiresAt.IsZero() {
+	if data.Email != "teammate@example.com" || data.InvitedByUserID == nil || data.ExpiresAt.IsZero() || len(data.Metadata) == 0 {
 		t.Fatalf("unexpected invitation payload: %+v", data)
 	}
 }
