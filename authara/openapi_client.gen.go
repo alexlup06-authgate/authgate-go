@@ -252,6 +252,25 @@ func (c *Client) CallBeginPasskeyRegistration(ctx context.Context, incoming *htt
 	return &out, nil
 }
 
+func (c *Client) CallStartPasswordResetChallenge(ctx context.Context, incoming *http.Request, body APIPasswordResetRequest) (*APIChallengeReference, error) {
+	var out APIChallengeReference
+	path := "/auth/api/v1/password-reset/challenges"
+	_, err := c.doJSONBody(ctx, http.MethodPost, path, body, &out, apiRequestOptions(incoming, []string{"authara_csrf"}, true)...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *Client) CallVerifyPasswordResetChallenge(ctx context.Context, incoming *http.Request, body APIPasswordResetChallengeVerification) error {
+	path := "/auth/api/v1/password-reset/challenges/verify"
+	_, err := c.doJSONBody(ctx, http.MethodPost, path, body, nil, apiRequestOptions(incoming, []string{"authara_csrf"}, true)...)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (c *Client) CallLogout(ctx context.Context, incoming *http.Request) error {
 	path := "/auth/api/v1/sessions/logout"
 	_, err := c.doJSONBody(ctx, http.MethodPost, path, nil, nil, apiRequestOptions(incoming, []string{"authara_csrf"}, true)...)
@@ -330,6 +349,15 @@ func (c *Client) CallGetCurrentUser(ctx context.Context, incoming *http.Request)
 		return nil, err
 	}
 	return &out, nil
+}
+
+func (c *Client) CallSetCurrentUserPassword(ctx context.Context, incoming *http.Request, body APISetPasswordRequest) error {
+	path := "/auth/api/v1/users/password"
+	_, err := c.doJSONBody(ctx, http.MethodPut, path, body, nil, apiRequestOptions(incoming, []string{"authara_access", "authara_csrf"}, true)...)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (c *Client) CallListPublicUserMemberships(ctx context.Context, incoming *http.Request, userID uuid.UUID) (*APIUserMemberships, error) {

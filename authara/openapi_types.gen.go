@@ -198,8 +198,22 @@ type APIPasswordLoginRequest struct {
 	Password string `json:"password"`
 }
 
+type APIPasswordResetChallengeVerification struct {
+	ChallengeID uuid.UUID `json:"challenge_id"`
+	Code        string    `json:"code"`
+}
+
+type APIPasswordResetRequest struct {
+	Email       string `json:"email"`
+	NewPassword string `json:"new_password"`
+}
+
 type APIRevokeInvitationRequest struct {
 	RevokedByUserID *uuid.UUID `json:"revoked_by_user_id,omitempty"`
+}
+
+type APISetPasswordRequest struct {
+	Password string `json:"password"`
 }
 
 type APISignupChallenge struct {
