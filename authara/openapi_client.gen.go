@@ -380,6 +380,15 @@ func (c *Client) CallCreateInternalOrganization(ctx context.Context, body APIInt
 	return &out, nil
 }
 
+func (c *Client) CallDeleteInternalOrganization(ctx context.Context, organizationID uuid.UUID, body APIInternalOrganizationActorRequest) error {
+	path := "/auth/internal/v1/organizations/" + url.PathEscape(organizationID.String()) + ""
+	err := c.internalJSON(ctx, http.MethodDelete, path, body, nil)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (c *Client) CallCreateInternalOrganizationInvitation(ctx context.Context, organizationID uuid.UUID, body APIInternalCreateInvitationRequest) (*APIOrganizationInvitationEnvelope, error) {
 	var out APIOrganizationInvitationEnvelope
 	path := "/auth/internal/v1/organizations/" + url.PathEscape(organizationID.String()) + "/invitations"
@@ -398,4 +407,31 @@ func (c *Client) CallResendInternalOrganizationInvitation(ctx context.Context, o
 		return nil, err
 	}
 	return &out, nil
+}
+
+func (c *Client) CallRemoveInternalOrganizationMember(ctx context.Context, organizationID uuid.UUID, userID uuid.UUID, body APIInternalOrganizationActorRequest) error {
+	path := "/auth/internal/v1/organizations/" + url.PathEscape(organizationID.String()) + "/members/" + url.PathEscape(userID.String()) + ""
+	err := c.internalJSON(ctx, http.MethodDelete, path, body, nil)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *Client) CallTransferInternalOrganizationOwnership(ctx context.Context, organizationID uuid.UUID, body APIInternalOwnershipTransferRequest) error {
+	path := "/auth/internal/v1/organizations/" + url.PathEscape(organizationID.String()) + "/ownership-transfer"
+	err := c.internalJSON(ctx, http.MethodPost, path, body, nil)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *Client) CallDeleteInternalUser(ctx context.Context, userID uuid.UUID) error {
+	path := "/auth/internal/v1/users/" + url.PathEscape(userID.String()) + ""
+	err := c.internalJSON(ctx, http.MethodDelete, path, nil, nil)
+	if err != nil {
+		return err
+	}
+	return nil
 }

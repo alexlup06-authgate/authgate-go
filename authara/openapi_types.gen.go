@@ -93,6 +93,15 @@ type APIInternalCreateOrganizationRequest struct {
 	Name            string    `json:"name"`
 }
 
+type APIInternalOrganizationActorRequest struct {
+	ActorUserID uuid.UUID `json:"actor_user_id"`
+}
+
+type APIInternalOwnershipTransferRequest struct {
+	ActorUserID    uuid.UUID `json:"actor_user_id"`
+	NewOwnerUserID uuid.UUID `json:"new_owner_user_id"`
+}
+
 type APIMembership struct {
 	CreatedAt      time.Time           `json:"created_at"`
 	OrganizationID uuid.UUID           `json:"organization_id"`
