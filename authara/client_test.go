@@ -122,6 +122,32 @@ func TestGeneratedInternalCallSendsBearerToken(t *testing.T) {
 	}
 }
 
+func TestGeneratedInternalLifecycleCallSendsActor(t *testing.T) {
+	orgID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	actorID := uuid.MustParse("33333333-3333-3333-3333-333333333333")
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodDelete || r.URL.Path != "/auth/internal/v1/organizations/"+orgID.String() {
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+		if got := r.Header.Get("Authorization"); got != "Bearer token" {
+			t.Fatalf("unexpected authorization: %q", got)
+		}
+		var body APIInternalOrganizationActorRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("decode request body: %v", err)
+		}
+		if body.ActorUserID != actorID {
+			t.Fatalf("unexpected actor: %s", body.ActorUserID)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	client, _ := newTestClient(t, handler, WithInternalAPIToken("token"))
+	if err := client.CallDeleteInternalOrganization(context.Background(), orgID, APIInternalOrganizationActorRequest{ActorUserID: actorID}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestGeneratedCallDecodesAPIError(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

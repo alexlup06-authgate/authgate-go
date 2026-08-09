@@ -245,6 +245,22 @@ invite, err := client.CallCreateInternalOrganizationInvitation(
 		Metadata:    &metadata,
 	},
 )
+
+// After your backend has checked subscriptions and product data:
+err = client.CallRemoveInternalOrganizationMember(
+	ctx,
+	organizationID,
+	userID,
+	authara.APIInternalOrganizationActorRequest{ActorUserID: actorUserID},
+)
+
+err = client.CallDeleteInternalOrganization(
+	ctx,
+	organizationID,
+	authara.APIInternalOrganizationActorRequest{ActorUserID: actorUserID},
+)
+
+err = client.CallDeleteInternalUser(ctx, userID)
 ```
 
 ---
