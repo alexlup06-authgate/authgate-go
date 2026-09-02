@@ -13,6 +13,49 @@ type APIAPIError struct {
 	Message string `json:"message"`
 }
 
+type APIAccount struct {
+	AuthMethods []APIAuthMethod     `json:"auth_methods"`
+	Passkeys    []APIAccountPasskey `json:"passkeys"`
+	Sessions    []APIAccountSession `json:"sessions"`
+	User        APIAuthUser         `json:"user"`
+}
+
+type APIAccountPasskey struct {
+	CreatedAt  time.Time  `json:"created_at"`
+	ID         uuid.UUID  `json:"id"`
+	LastUsedAt *time.Time `json:"last_used_at,omitempty"`
+	Name       string     `json:"name"`
+}
+
+type APIAccountRecoveryGoogleProofRequest struct {
+	Credential      string  `json:"credential"`
+	InvitationToken *string `json:"invitation_token,omitempty"`
+	Nonce           string  `json:"nonce"`
+}
+
+type APIAccountRecoveryLink struct {
+	LinkID       uuid.UUID `json:"link_id"`
+	ProofMethods []string  `json:"proof_methods"`
+}
+
+type APIAccountRecoveryPasswordProofRequest struct {
+	InvitationToken *string `json:"invitation_token,omitempty"`
+	Password        string  `json:"password"`
+}
+
+type APIAccountSession struct {
+	CreatedAt time.Time `json:"created_at"`
+	Current   bool      `json:"current"`
+	ExpiresAt time.Time `json:"expires_at"`
+	ID        uuid.UUID `json:"id"`
+	UserAgent string    `json:"user_agent"`
+}
+
+type APIAuthMethod struct {
+	CreatedAt time.Time `json:"created_at"`
+	Provider  string    `json:"provider"`
+}
+
 type APIAuthSession struct {
 	AccessToken  string      `json:"access_token"`
 	RefreshToken string      `json:"refresh_token"`
@@ -45,6 +88,20 @@ type APIChallengeReference struct {
 	ChallengeID uuid.UUID `json:"challenge_id"`
 }
 
+type APIChallengeVerification struct {
+	ChallengeID uuid.UUID `json:"challenge_id"`
+	Code        string    `json:"code"`
+}
+
+type APIChangePasswordRequest struct {
+	CurrentPassword string `json:"current_password"`
+	NewPassword     string `json:"new_password"`
+}
+
+type APIChangeUsernameRequest struct {
+	Username string `json:"username"`
+}
+
 type APICurrentOrganizationMember struct {
 	CreatedAt time.Time           `json:"created_at"`
 	Email     string              `json:"email"`
@@ -65,6 +122,10 @@ type APICurrentUser struct {
 	Organization APIOrganizationSummary `json:"organization"`
 	Roles        []string               `json:"roles"`
 	Username     string                 `json:"username"`
+}
+
+type APIEmailChangeRequest struct {
+	NewEmail string `json:"new_email"`
 }
 
 type APIErrorResponse struct {
@@ -100,6 +161,33 @@ type APIInternalOrganizationActorRequest struct {
 type APIInternalOwnershipTransferRequest struct {
 	ActorUserID    uuid.UUID `json:"actor_user_id"`
 	NewOwnerUserID uuid.UUID `json:"new_owner_user_id"`
+}
+
+type APIInvitationGoogleRequest struct {
+	Credential string `json:"credential"`
+	Flow       string `json:"flow"`
+	Nonce      string `json:"nonce"`
+	Token      string `json:"token"`
+}
+
+type APIInvitationGoogleResult struct {
+	Recovery *APIAccountRecoveryLink `json:"recovery,omitempty"`
+	Session  *APIAuthSession         `json:"session,omitempty"`
+	Status   string                  `json:"status"`
+}
+
+type APIInvitationPasswordLoginRequest struct {
+	Password string `json:"password"`
+	Token    string `json:"token"`
+}
+
+type APIInvitationPreview struct {
+	Invitation   APIOrganizationInvitation `json:"invitation"`
+	Organization APIOrganization           `json:"organization"`
+}
+
+type APIInvitationTokenRequest struct {
+	Token string `json:"token"`
 }
 
 type APIMembership struct {
@@ -258,17 +346,37 @@ type APIUserMemberships struct {
 	Memberships []APIMembershipWithOrganization `json:"memberships"`
 }
 
+const APIAcceptInvitationAudienceApp = "app"
+
+const APIAccountRecoveryLinkProofMethodsItemGoogle = "google"
+
+const APIAccountRecoveryLinkProofMethodsItemPassword = "password"
+
 const APIAppAudienceApp = "app"
 
 const APIAudienceAdmin = "admin"
 
 const APIAudienceApp = "app"
 
+const APIAuthMethodProviderGoogle = "google"
+
+const APIAuthMethodProviderPassword = "password"
+
+const APIAuthProviderGoogle = "google"
+
+const APIAuthProviderPassword = "password"
+
+const APIAuthenticateAndAcceptInvitationWithGoogleAudienceApp = "app"
+
 const APICapabilitiesOrganizationModeMulti = "multi"
 
 const APICapabilitiesOrganizationModePersonal = "personal"
 
 const APICapabilitiesOrganizationModeSingle = "single"
+
+const APICompleteAccountRecoveryLinkWithGoogleAudienceApp = "app"
+
+const APICompleteAccountRecoveryLinkWithPasswordAudienceApp = "app"
 
 const APICurrentUserRolesItemAutharaAdmin = "authara:admin"
 
@@ -279,6 +387,16 @@ const APICurrentUserRolesItemAutharaMonitor = "authara:monitor"
 const APIFinishPasskeyAuthenticationAudienceAdmin = "admin"
 
 const APIFinishPasskeyAuthenticationAudienceApp = "app"
+
+const APIInvitationGoogleRequestFlowLogin = "login"
+
+const APIInvitationGoogleRequestFlowSignup = "signup"
+
+const APIInvitationGoogleResultStatusAuthenticated = "authenticated"
+
+const APIInvitationGoogleResultStatusProofRequired = "proof_required"
+
+const APILoginAndAcceptInvitationAudienceApp = "app"
 
 const APILoginWithGoogleAudienceAdmin = "admin"
 

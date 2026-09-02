@@ -32,6 +32,107 @@ func apiRequestOptions(incoming *http.Request, cookies []string, csrf bool) []re
 	return opts
 }
 
+func (c *Client) CallGetCurrentAccount(ctx context.Context, incoming *http.Request) (*APIAccount, error) {
+	var out APIAccount
+	path := "/auth/api/v1/account"
+	_, err := c.doJSONBody(ctx, http.MethodGet, path, nil, &out, apiRequestOptions(incoming, []string{"authara_access"}, false)...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *Client) CallLinkCurrentUserGoogle(ctx context.Context, incoming *http.Request, body APIGoogleLoginRequest) error {
+	path := "/auth/api/v1/account/auth-methods/google"
+	_, err := c.doJSONBody(ctx, http.MethodPost, path, body, nil, apiRequestOptions(incoming, []string{"authara_access", "authara_csrf", "authara_oauth_nonce"}, true)...)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *Client) CallUnlinkCurrentUserAuthMethod(ctx context.Context, incoming *http.Request, provider string) error {
+	path := "/auth/api/v1/account/auth-methods/" + url.PathEscape(provider) + ""
+	_, err := c.doJSONBody(ctx, http.MethodDelete, path, nil, nil, apiRequestOptions(incoming, []string{"authara_access", "authara_csrf"}, true)...)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *Client) CallStartCurrentUserEmailChange(ctx context.Context, incoming *http.Request, body APIEmailChangeRequest) (*APIChallengeReference, error) {
+	var out APIChallengeReference
+	path := "/auth/api/v1/account/email-change/challenges"
+	_, err := c.doJSONBody(ctx, http.MethodPost, path, body, &out, apiRequestOptions(incoming, []string{"authara_access", "authara_csrf"}, true)...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *Client) CallVerifyCurrentUserEmailChange(ctx context.Context, incoming *http.Request, body APIChallengeVerification) error {
+	path := "/auth/api/v1/account/email-change/challenges/verify"
+	_, err := c.doJSONBody(ctx, http.MethodPost, path, body, nil, apiRequestOptions(incoming, []string{"authara_access", "authara_csrf"}, true)...)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *Client) CallDeleteCurrentUserPasskey(ctx context.Context, incoming *http.Request, passkeyID uuid.UUID) error {
+	path := "/auth/api/v1/account/passkeys/" + url.PathEscape(passkeyID.String()) + ""
+	_, err := c.doJSONBody(ctx, http.MethodDelete, path, nil, nil, apiRequestOptions(incoming, []string{"authara_access", "authara_csrf"}, true)...)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *Client) CallAddCurrentUserPassword(ctx context.Context, incoming *http.Request, body APISetPasswordRequest) error {
+	path := "/auth/api/v1/account/password"
+	_, err := c.doJSONBody(ctx, http.MethodPost, path, body, nil, apiRequestOptions(incoming, []string{"authara_access", "authara_csrf"}, true)...)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *Client) CallChangeCurrentUserPassword(ctx context.Context, incoming *http.Request, body APIChangePasswordRequest) error {
+	path := "/auth/api/v1/account/password"
+	_, err := c.doJSONBody(ctx, http.MethodPut, path, body, nil, apiRequestOptions(incoming, []string{"authara_access", "authara_csrf"}, true)...)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *Client) CallRevokeCurrentUserOtherSessions(ctx context.Context, incoming *http.Request) error {
+	path := "/auth/api/v1/account/sessions/others"
+	_, err := c.doJSONBody(ctx, http.MethodDelete, path, nil, nil, apiRequestOptions(incoming, []string{"authara_access", "authara_csrf"}, true)...)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *Client) CallRevokeCurrentUserSession(ctx context.Context, incoming *http.Request, sessionID uuid.UUID) error {
+	path := "/auth/api/v1/account/sessions/" + url.PathEscape(sessionID.String()) + ""
+	_, err := c.doJSONBody(ctx, http.MethodDelete, path, nil, nil, apiRequestOptions(incoming, []string{"authara_access", "authara_csrf"}, true)...)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *Client) CallChangeCurrentUsername(ctx context.Context, incoming *http.Request, body APIChangeUsernameRequest) error {
+	path := "/auth/api/v1/account/username"
+	_, err := c.doJSONBody(ctx, http.MethodPatch, path, body, nil, apiRequestOptions(incoming, []string{"authara_access", "authara_csrf"}, true)...)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (c *Client) CallGetPublicCapabilities(ctx context.Context, incoming *http.Request) (*APICapabilities, error) {
 	var out APICapabilities
 	path := "/auth/api/v1/capabilities"
@@ -54,6 +155,58 @@ func (c *Client) CallResendChallenge(ctx context.Context, incoming *http.Request
 func (c *Client) CallGetCSRFToken(ctx context.Context) (*APICSRFToken, error) {
 	var out APICSRFToken
 	path := "/auth/api/v1/csrf"
+	_, err := c.doJSONBody(ctx, http.MethodGet, path, nil, &out)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *Client) CallAcceptInvitation(ctx context.Context, incoming *http.Request, audience string, body APIInvitationTokenRequest) (*APITokens, error) {
+	var out APITokens
+	path := "/auth/api/v1/invitations/accept"
+	query := url.Values{}
+	query.Set("audience", audienceOrApp(audience))
+	path += "?" + query.Encode()
+	_, err := c.doJSONBody(ctx, http.MethodPost, path, body, &out, apiRequestOptions(incoming, []string{"authara_access", "authara_csrf"}, true)...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *Client) CallAuthenticateAndAcceptInvitationWithGoogle(ctx context.Context, incoming *http.Request, audience string, body APIInvitationGoogleRequest) (*APIInvitationGoogleResult, error) {
+	var out APIInvitationGoogleResult
+	path := "/auth/api/v1/invitations/google"
+	query := url.Values{}
+	query.Set("audience", audienceOrApp(audience))
+	path += "?" + query.Encode()
+	_, err := c.doJSONBody(ctx, http.MethodPost, path, body, &out, apiRequestOptions(incoming, []string{"authara_csrf", "authara_oauth_nonce"}, true)...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *Client) CallLoginAndAcceptInvitation(ctx context.Context, incoming *http.Request, audience string, body APIInvitationPasswordLoginRequest) (*APIAuthSession, error) {
+	var out APIAuthSession
+	path := "/auth/api/v1/invitations/login"
+	query := url.Values{}
+	query.Set("audience", audienceOrApp(audience))
+	path += "?" + query.Encode()
+	_, err := c.doJSONBody(ctx, http.MethodPost, path, body, &out, apiRequestOptions(incoming, []string{"authara_csrf"}, true)...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *Client) CallPreviewInvitation(ctx context.Context, token string) (*APIInvitationPreview, error) {
+	var out APIInvitationPreview
+	path := "/auth/api/v1/invitations/preview"
+	query := url.Values{}
+	query.Set("token", token)
+	path += "?" + query.Encode()
 	_, err := c.doJSONBody(ctx, http.MethodGet, path, nil, &out)
 	if err != nil {
 		return nil, err
@@ -269,6 +422,42 @@ func (c *Client) CallVerifyPasswordResetChallenge(ctx context.Context, incoming 
 		return err
 	}
 	return nil
+}
+
+func (c *Client) CallStartGoogleAccountRecoveryLink(ctx context.Context, incoming *http.Request, body APIGoogleLoginRequest) (*APIAccountRecoveryLink, error) {
+	var out APIAccountRecoveryLink
+	path := "/auth/api/v1/provider-links/recovery/google"
+	_, err := c.doJSONBody(ctx, http.MethodPost, path, body, &out, apiRequestOptions(incoming, []string{"authara_csrf", "authara_oauth_nonce"}, true)...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *Client) CallCompleteAccountRecoveryLinkWithGoogle(ctx context.Context, incoming *http.Request, linkID uuid.UUID, audience string, body APIAccountRecoveryGoogleProofRequest) (*APIAuthSession, error) {
+	var out APIAuthSession
+	path := "/auth/api/v1/provider-links/recovery/" + url.PathEscape(linkID.String()) + "/google"
+	query := url.Values{}
+	query.Set("audience", audienceOrApp(audience))
+	path += "?" + query.Encode()
+	_, err := c.doJSONBody(ctx, http.MethodPost, path, body, &out, apiRequestOptions(incoming, []string{"authara_csrf", "authara_oauth_nonce"}, true)...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *Client) CallCompleteAccountRecoveryLinkWithPassword(ctx context.Context, incoming *http.Request, linkID uuid.UUID, audience string, body APIAccountRecoveryPasswordProofRequest) (*APIAuthSession, error) {
+	var out APIAuthSession
+	path := "/auth/api/v1/provider-links/recovery/" + url.PathEscape(linkID.String()) + "/password"
+	query := url.Values{}
+	query.Set("audience", audienceOrApp(audience))
+	path += "?" + query.Encode()
+	_, err := c.doJSONBody(ctx, http.MethodPost, path, body, &out, apiRequestOptions(incoming, []string{"authara_csrf"}, true)...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
 }
 
 func (c *Client) CallLogout(ctx context.Context, incoming *http.Request) error {
