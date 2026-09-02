@@ -43,11 +43,20 @@ jobs:
           manifest-file: .release-please-manifest.json
 
       - name: Enable release PR auto-merge
-        if: steps.release.outputs.prs_created == 'true' && steps.provenance.outputs.released == 'true'
+        if: steps.provenance.outputs.released == 'true' && steps.release.outputs.release_created != 'true'
         continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.AUTHARA_SDK_RELEASE_TOKEN || github.token }}
-          RELEASE_PR: ${{ steps.release.outputs.pr }}
         run: |
-          pr_number="$(jq -r '.number' <<< "$RELEASE_PR")"
+          pr_number="$(gh pr list \
+            --repo "$GITHUB_REPOSITORY" \
+            --base main \
+            --state open \
+            --json number,headRefName \
+            --jq '[.[] | select(.headRefName | startswith("release-please--branches--main"))][0].number')"
+          if test -z "$pr_number"; then
+            echo "No open Release Please PR found."
+            exit 0
+          fi
+          gh pr update-branch --repo "$GITHUB_REPOSITORY" "$pr_number"
           gh pr merge --repo "$GITHUB_REPOSITORY" --auto --squash "$pr_number"
