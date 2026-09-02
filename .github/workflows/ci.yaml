@@ -12,6 +12,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Read generated source
+        id: generated-source
+        run: echo "core_sha=$(jq -r '.core.commit' .codegen/manifest.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout generated Core source
+        uses: actions/checkout@v4
+        with:
+          repository: authara-org/authara
+          ref: ${{ steps.generated-source.outputs.core_sha }}
+          path: .authara-core-source
+          token: ${{ secrets.AUTHARA_SDK_RELEASE_TOKEN || github.token }}
+
+      - name: Verify generated source integrity
+        run: |
+          expected_sha="$(jq -r '.core.contractSha256' .codegen/manifest.json)"
+          actual_sha="$(sha256sum .authara-core-source/contract/openapi.yaml | cut -d ' ' -f 1)"
+          test "$actual_sha" = "$expected_sha"
+
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
@@ -39,3 +57,13 @@ jobs:
       - name: Test SDK generator
         working-directory: cmd/authara-sdk-gen
         run: go test ./...
+
+      - name: Check generated SDK drift
+        working-directory: cmd/authara-sdk-gen
+        run: |
+          go run . \
+            -openapi ../../.authara-core-source/contract/openapi.yaml \
+            -out ../../authara
+          git -C ../.. diff --exit-code -- \
+            authara/openapi_types.gen.go \
+            authara/openapi_client.gen.go

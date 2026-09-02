@@ -1,0 +1,53 @@
+name: Release Please
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: release-please-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout release state
+        uses: actions/checkout@v4
+
+      - name: Check Core release provenance
+        id: provenance
+        run: |
+          core_version="$(jq -r '.core.version' .codegen/manifest.json)"
+          test -n "$core_version"
+          test "$core_version" != "null"
+          if test "$core_version" = "unreleased"; then
+            echo "released=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "released=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create or update Go SDK release PR
+        id: release
+        uses: googleapis/release-please-action@v4
+        with:
+          token: ${{ secrets.AUTHARA_SDK_RELEASE_TOKEN || github.token }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+      - name: Enable release PR auto-merge
+        if: steps.release.outputs.prs_created == 'true' && steps.provenance.outputs.released == 'true'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.AUTHARA_SDK_RELEASE_TOKEN || github.token }}
+          RELEASE_PR: ${{ steps.release.outputs.pr }}
+        run: |
+          pr_number="$(jq -r '.number' <<< "$RELEASE_PR")"
+          gh pr merge --repo "$GITHUB_REPOSITORY" --auto --squash "$pr_number"
