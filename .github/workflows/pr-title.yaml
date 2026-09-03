@@ -1,0 +1,26 @@
+name: PR title
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  pr-title:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate Conventional Commit title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          pattern='^(feat|fix|perf|refactor|docs|test|build|ci|chore|revert|deps)(\([[:alnum:]./_-]+\))?!?: .+$'
+          if [[ ! "$PR_TITLE" =~ $pattern ]]; then
+            echo "PR title must use Conventional Commits, for example:" >&2
+            echo "  fix: correct webhook verification" >&2
+            echo "  feat(api): add webhook retries" >&2
+            echo "  feat(api)!: change the webhook payload" >&2
+            exit 1
+          fi

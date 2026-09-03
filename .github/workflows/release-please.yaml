@@ -44,7 +44,6 @@ jobs:
 
       - name: Enable release PR auto-merge
         if: steps.provenance.outputs.released == 'true' && steps.release.outputs.release_created != 'true'
-        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.AUTHARA_SDK_RELEASE_TOKEN || github.token }}
         run: |
