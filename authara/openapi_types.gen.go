@@ -291,8 +291,8 @@ type APIPasskeyRegistrationFinishRequest struct {
 }
 
 type APIPasswordLoginRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Identifier string `json:"identifier"`
+	Password   string `json:"password"`
 }
 
 type APIPasswordResetChallengeVerification struct {
