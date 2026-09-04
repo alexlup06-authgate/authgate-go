@@ -31,6 +31,7 @@ func TestParseJWTKeys_InvalidBase64(t *testing.T) {
 
 func TestConfigFromEnv_Defaults(t *testing.T) {
 	t.Setenv("AUTHARA_JWT_KEYS", "k1:YWJj")
+	t.Setenv("AUTHARA_ACCESS_TOKEN_REVOCATION_ENABLED", "")
 
 	cfg, err := ConfigFromEnv()
 	if err != nil {
@@ -42,6 +43,9 @@ func TestConfigFromEnv_Defaults(t *testing.T) {
 	}
 	if cfg.Issuer != "authara" {
 		t.Fatalf("expected default issuer %q, got %q", "authara", cfg.Issuer)
+	}
+	if cfg.AccessTokenRevocationEnabled {
+		t.Fatal("expected access-token revocation checks to be disabled by default")
 	}
 }
 
@@ -63,6 +67,29 @@ func TestConfigFromEnv_BaseURL(t *testing.T) {
 	}
 	if InternalAPITokenFromEnv() != "secret" {
 		t.Fatalf("expected internal api token helper to trim")
+	}
+}
+
+func TestConfigFromEnv_AccessTokenRevocation(t *testing.T) {
+	t.Setenv("AUTHARA_JWT_KEYS", "k1:YWJj")
+	t.Setenv("AUTHARA_ACCESS_TOKEN_REVOCATION_ENABLED", "true")
+	t.Setenv("AUTHARA_REDIS_HOST", " redis.internal ")
+	t.Setenv("AUTHARA_REDIS_PORT", "6380")
+	t.Setenv("AUTHARA_REDIS_PASSWORD", " secret with spaces ")
+	t.Setenv("AUTHARA_REDIS_DB", "2")
+
+	cfg, err := ConfigFromEnv()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !cfg.AccessTokenRevocationEnabled {
+		t.Fatal("expected access-token revocation checks to be enabled")
+	}
+	if cfg.Redis.Host != "redis.internal" || cfg.Redis.Port != 6380 || cfg.Redis.DB != 2 {
+		t.Fatalf("unexpected Redis config: %+v", cfg.Redis)
+	}
+	if cfg.Redis.Password != " secret with spaces " {
+		t.Fatalf("Redis password was unexpectedly trimmed: %q", cfg.Redis.Password)
 	}
 }
 

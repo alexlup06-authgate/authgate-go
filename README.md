@@ -39,6 +39,7 @@ sessions, refresh logic, CSRF enforcement, and security invariants.
 - Injects authentication facts into `context.Context`
 - Provides HTTP middleware for common auth patterns
 - Exposes helpers for reading authentication facts from context
+- Optionally checks Authara's shared Redis revocation entries
 
 ### Backend client helpers (optional)
 
@@ -62,8 +63,9 @@ These helpers are **strict by design**:
 - Does **not** enforce authorization policy
 - Does **not** perform background or implicit network calls
 
-> Exception: `RequireAuthWithRefresh` can perform a best-effort refresh call,
-> but only if explicitly enabled via configuration.
+> Exceptions: `RequireAuthWithRefresh` can perform a best-effort refresh call,
+> and middleware can query Redis for access-token revocations. Both behaviors
+> must be explicitly enabled through configuration.
 
 All authentication, session management, refresh logic, and CSRF enforcement live
 exclusively in **Authara itself**, not in this SDK.
@@ -126,6 +128,11 @@ Expected environment variables:
 - `AUTHARA_JWT_KEYS` (required)
 - `AUTHARA_BASE_URL` (optional, enables refresh)
 - `AUTHARA_INTERNAL_API_TOKEN` (optional, enables internal API helpers)
+- `AUTHARA_ACCESS_TOKEN_REVOCATION_ENABLED` (default: `false`)
+- `AUTHARA_REDIS_HOST` (default: `localhost`, used when revocation checks are enabled)
+- `AUTHARA_REDIS_PORT` (default: `6379`, used when revocation checks are enabled)
+- `AUTHARA_REDIS_PASSWORD` (optional, used when revocation checks are enabled)
+- `AUTHARA_REDIS_DB` (default: `0`, used when revocation checks are enabled)
 
 This helper is intentionally minimal and does not introduce implicit behavior.
 
@@ -157,6 +164,32 @@ Notes:
 - Authara remains the only component that knows refresh semantics. The SDK only
   triggers refresh and re-verifies the new access token.
 - If `AutharaBaseURL` is not set, refresh behavior is disabled.
+
+---
+
+## Optional access-token revocation checks
+
+By default, middleware verifies access-token JWTs locally. To also reject
+tokens that Authara Core has revoked, connect the SDK to the same Redis database
+as Core:
+
+```env
+AUTHARA_ACCESS_TOKEN_REVOCATION_ENABLED=true
+AUTHARA_REDIS_HOST=redis
+AUTHARA_REDIS_PORT=6379
+AUTHARA_REDIS_PASSWORD=
+AUTHARA_REDIS_DB=0
+```
+
+Every middleware token verification checks the exact token, session, user, and
+organization-membership revocation entries. Redis connection and lookup
+failures fail closed: `New` fails if Redis is unavailable at startup, and
+protected requests are treated as unauthenticated if a runtime lookup fails.
+`TryAuth` continues without attaching an identity in that case.
+Call `sdk.Close()` during shutdown.
+
+The Redis formats are synchronized from Authara Core's versioned
+`contract/access-token-revocations.json` contract.
 
 ---
 

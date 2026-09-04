@@ -30,6 +30,11 @@ jobs:
           actual_sha="$(sha256sum .authara-core-source/contract/openapi.yaml | cut -d ' ' -f 1)"
           test "$actual_sha" = "$expected_sha"
 
+          revocation_contract="$(jq -r '.core.revocationContract // empty' .codegen/manifest.json)"
+          if test -n "$revocation_contract"; then
+            cmp ".authara-core-source/$revocation_contract" .codegen/access-token-revocations.json
+          fi
+
       - name: Set up Go
         uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:

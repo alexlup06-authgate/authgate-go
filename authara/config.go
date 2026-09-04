@@ -39,4 +39,22 @@ type Config struct {
 	// HTTPClient is used for outbound calls to Authara (refresh).
 	// If nil, http.DefaultClient is used.
 	HTTPClient *http.Client
+
+	// AccessTokenRevocationEnabled makes middleware reject access tokens that
+	// Authara Core has revoked in Redis. Checks fail closed if Redis is
+	// unavailable.
+	AccessTokenRevocationEnabled bool
+
+	// Redis configures the shared Redis used by Authara Core for access-token
+	// revocations. It is only used when AccessTokenRevocationEnabled is true.
+	Redis RedisConfig
+}
+
+// RedisConfig configures the Redis connection used for access-token revocation
+// checks.
+type RedisConfig struct {
+	Host     string
+	Port     int
+	Password string
+	DB       int
 }
