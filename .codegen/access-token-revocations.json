@@ -1,0 +1,6 @@
+{
+  "token": "authara:access-token:revoked:token:{token_sha256}",
+  "session": "authara:access-token:revoked:session:{session_id}",
+  "user": "authara:access-token:revoked:user:{user_id}",
+  "membership": "authara:access-token:revoked:membership:{user_id}:{organization_id}"
+}

@@ -35,7 +35,7 @@ func (s *SDK) RequireAuthWithRefresh(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Fast path: access token present & valid
 		if accessToken, ok := accessTokenFromRequest(r); ok {
-			if identity, err := s.verifier.verify(accessToken); err == nil {
+			if identity, err := s.verifyAccessToken(r.Context(), accessToken); err == nil {
 				next.ServeHTTP(w, r.WithContext(withAccessIdentity(r.Context(), identity)))
 				return
 			}
@@ -167,7 +167,7 @@ func (s *SDK) tryRefreshAndVerify(w http.ResponseWriter, r *http.Request) (acces
 		return accessIdentity{}, nil, false
 	}
 
-	identity, err := s.verifier.verify(accessToken)
+	identity, err := s.verifyAccessToken(r.Context(), accessToken)
 	if err != nil {
 		return accessIdentity{}, nil, false
 	}
@@ -203,7 +203,7 @@ func (s *SDK) RequireAuth(next http.Handler) http.Handler {
 			return
 		}
 
-		identity, err := s.verifier.verify(accessToken)
+		identity, err := s.verifyAccessToken(r.Context(), accessToken)
 		if err != nil {
 			loginURL := LoginPath + "?return_to=" + url.QueryEscape(buildReturnTo(r))
 			unauthenticatedResponse(w, r, loginURL)
@@ -293,7 +293,7 @@ func bearerToken(r *http.Request) (string, bool) {
 func (s *SDK) TryAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if accessToken, ok := accessTokenFromRequest(r); ok {
-			identity, err := s.verifier.verify(accessToken)
+			identity, err := s.verifyAccessToken(r.Context(), accessToken)
 			if err == nil {
 				r = r.WithContext(withAccessIdentity(r.Context(), identity))
 			}

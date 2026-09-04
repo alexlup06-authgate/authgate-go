@@ -86,19 +86,23 @@ jobs:
           -openapi ../../.authara-core-source/contract/openapi.yaml
           -out ../../authara
 
+      - name: Copy access-token revocation contract
+        run: cp .authara-core-source/contract/access-token-revocations.json .codegen/access-token-revocations.json
+
       - name: Detect generated changes and record provenance
         id: changes
         run: |
           generated_changed=false
           source_changed=false
-          if test -n "$(git status --porcelain -- authara/openapi_types.gen.go authara/openapi_client.gen.go)"; then
+          if test -n "$(git status --porcelain -- authara/openapi_types.gen.go authara/openapi_client.gen.go .codegen/access-token-revocations.json)"; then
             generated_changed=true
           fi
 
           contract_sha="$(sha256sum .authara-core-source/contract/openapi.yaml | cut -d ' ' -f 1)"
           previous_contract_sha="$(jq -r '.core.contractSha256 // ""' .codegen/manifest.json)"
+          previous_revocation_contract="$(jq -r '.core.revocationContract // ""' .codegen/manifest.json)"
           previous_version="$(jq -r '.core.version // ""' .codegen/manifest.json)"
-          if test "$contract_sha" != "$previous_contract_sha" || test "$previous_version" = unreleased; then
+          if test "$contract_sha" != "$previous_contract_sha" || test -z "$previous_revocation_contract" || test "$previous_version" = unreleased; then
             source_changed=true
           fi
 
@@ -120,7 +124,8 @@ jobs:
                 version: $version,
                 commit: $commit,
                 contract: "contract/openapi.yaml",
-                contractSha256: $contract_sha
+                contractSha256: $contract_sha,
+                revocationContract: "contract/access-token-revocations.json"
               },
               generatorCommit: $generator_commit
             }' > .codegen/manifest.json
@@ -158,7 +163,7 @@ jobs:
             git fetch origin "$branch:refs/remotes/origin/$branch"
           fi
           git checkout -B "$branch"
-          git add .codegen/manifest.json authara/openapi_types.gen.go authara/openapi_client.gen.go
+          git add .codegen/manifest.json .codegen/access-token-revocations.json authara/openapi_types.gen.go authara/openapi_client.gen.go
           git commit -m "$title"
           git push --force-with-lease origin "$branch"
 

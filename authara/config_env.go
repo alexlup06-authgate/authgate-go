@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -19,6 +20,11 @@ import (
 //
 //	AUTHARA_BASE_URL
 //	AUTHARA_INTERNAL_API_TOKEN
+//	AUTHARA_ACCESS_TOKEN_REVOCATION_ENABLED
+//	AUTHARA_REDIS_HOST
+//	AUTHARA_REDIS_PORT
+//	AUTHARA_REDIS_PASSWORD
+//	AUTHARA_REDIS_DB
 //
 // This helper is intentionally minimal and does not introduce implicit behavior.
 // It only maps environment variables to Config fields.
@@ -39,6 +45,28 @@ func ConfigFromEnv() (Config, error) {
 	}
 	if token := strings.TrimSpace(os.Getenv("AUTHARA_INTERNAL_API_TOKEN")); token != "" {
 		cfg.InternalAPIToken = token
+	}
+
+	revocationEnabled, err := optionalEnvBool("AUTHARA_ACCESS_TOKEN_REVOCATION_ENABLED")
+	if err != nil {
+		return Config{}, err
+	}
+	cfg.AccessTokenRevocationEnabled = revocationEnabled
+	if revocationEnabled {
+		redisPort, err := envIntOrDefault("AUTHARA_REDIS_PORT", 6379)
+		if err != nil {
+			return Config{}, err
+		}
+		redisDB, err := envIntOrDefault("AUTHARA_REDIS_DB", 0)
+		if err != nil {
+			return Config{}, err
+		}
+		cfg.Redis = RedisConfig{
+			Host:     envOrDefault("AUTHARA_REDIS_HOST", "localhost"),
+			Port:     redisPort,
+			Password: os.Getenv("AUTHARA_REDIS_PASSWORD"),
+			DB:       redisDB,
+		}
 	}
 
 	return cfg, nil
@@ -145,4 +173,28 @@ func envOrDefault(key, fallback string) string {
 		return fallback
 	}
 	return v
+}
+
+func optionalEnvBool(key string) (bool, error) {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return false, nil
+	}
+	value, err := strconv.ParseBool(raw)
+	if err != nil {
+		return false, fmt.Errorf("%s must be a boolean: %w", key, err)
+	}
+	return value, nil
+}
+
+func envIntOrDefault(key string, fallback int) (int, error) {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return fallback, nil
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil {
+		return 0, fmt.Errorf("%s must be an integer: %w", key, err)
+	}
+	return value, nil
 }

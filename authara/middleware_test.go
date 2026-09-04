@@ -125,6 +125,33 @@ func TestRequireAuth_BearerTokenAuthenticates(t *testing.T) {
 	}
 }
 
+func TestRequireAuth_RejectsRevokedAccessToken(t *testing.T) {
+	sdk, keys := newTestSDKWithRefresh(t, "", nil)
+	access := signAccessToken(t, keys, uuid.New(), []string{"authara:user"}, time.Hour)
+	_, claims, err := sdk.verifier.verifyWithClaims(access)
+	if err != nil {
+		t.Fatalf("verify test token: %v", err)
+	}
+	revocationKeys := accessTokenRevocationKeys(access, claims)
+	sdk.revocations = &accessTokenRevocations{store: &fakeRevocationStore{
+		values: map[string][]byte{revocationKeys[0]: []byte("1")},
+	}}
+
+	handler := sdk.RequireAuth(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		t.Fatal("handler should not be called for a revoked access token")
+	}))
+	req := httptest.NewRequest(http.MethodGet, "/api/private", nil)
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Authorization", "Bearer "+access)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected status 401, got %d", rec.Code)
+	}
+}
+
 /* -------------------- TryAuth -------------------- */
 
 func TestTryAuth_NoCookie_AllowsThrough(t *testing.T) {

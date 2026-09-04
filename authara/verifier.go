@@ -39,6 +39,11 @@ func newVerifier(cfg Config) (*verifier, error) {
 }
 
 func (v *verifier) verify(tokenString string) (accessIdentity, error) {
+	identity, _, err := v.verifyWithClaims(tokenString)
+	return identity, err
+}
+
+func (v *verifier) verifyWithClaims(tokenString string) (accessIdentity, *accessClaims, error) {
 	parser := jwt.NewParser(
 		jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Name}),
 		jwt.WithLeeway(clockSkew),
@@ -53,14 +58,14 @@ func (v *verifier) verify(tokenString string) (accessIdentity, error) {
 	)
 	if err != nil {
 		if errors.Is(err, jwt.ErrTokenExpired) {
-			return accessIdentity{}, ErrTokenExpired
+			return accessIdentity{}, nil, ErrTokenExpired
 		}
-		return accessIdentity{}, ErrInvalidToken
+		return accessIdentity{}, nil, ErrInvalidToken
 	}
 
 	claims, ok := token.Claims.(*accessClaims)
 	if !ok || !token.Valid {
-		return accessIdentity{}, ErrInvalidToken
+		return accessIdentity{}, nil, ErrInvalidToken
 	}
 
 	orgRole := strings.TrimSpace(claims.OrgRole)
@@ -68,17 +73,17 @@ func (v *verifier) verify(tokenString string) (accessIdentity, error) {
 		claims.SessionID == uuid.Nil ||
 		claims.OrgID == uuid.Nil ||
 		orgRole == "" {
-		return accessIdentity{}, ErrInvalidToken
+		return accessIdentity{}, nil, ErrInvalidToken
 	}
 
 	userID, err := uuid.Parse(claims.Subject)
 	if err != nil {
-		return accessIdentity{}, ErrInvalidToken
+		return accessIdentity{}, nil, ErrInvalidToken
 	}
 
 	for _, role := range claims.Roles {
 		if !strings.HasPrefix(role, "authara:") {
-			return accessIdentity{}, ErrInvalidRoleNamespace
+			return accessIdentity{}, nil, ErrInvalidRoleNamespace
 		}
 	}
 
@@ -87,7 +92,7 @@ func (v *verifier) verify(tokenString string) (accessIdentity, error) {
 		OrganizationID:   claims.OrgID,
 		OrganizationRole: orgRole,
 		Roles:            claims.Roles,
-	}, nil
+	}, claims, nil
 }
 
 func (v *verifier) keyFunc(t *jwt.Token) (any, error) {
